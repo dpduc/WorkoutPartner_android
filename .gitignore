@@ -3,8 +3,11 @@
 /local.properties
 /.idea/
 .DS_Store
-/build/
+# Every module's build output, not just the root's.
+build/
 /captures/
+# Claude Code's own local project state.
+.claude/
 .externalNativeBuild/
 .cxx/
 local.properties

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The actual look is defined in Compose (ui/theme/Theme.kt); this XML
+         theme only needs to exist for the manifest's android:theme and to
+         set the window background before Compose takes over. -->
+    <style name="Theme.WorkoutPartner" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
