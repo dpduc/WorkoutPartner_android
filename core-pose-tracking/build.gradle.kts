@@ -33,7 +33,14 @@ dependencies {
     implementation(project(":core-rep-counting"))
 
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.camera.core)
+    // `api`, not `implementation`: PoseTracker.start(...)'s own public
+    // signature takes a Preview.SurfaceProvider, so a downstream consumer
+    // (`app`, ticket 09) needs camera-core on its compile classpath just to
+    // reference that type — the same "public API type needs api" reasoning
+    // ticket 05/06 applied to data's Room/coroutines dependencies. The
+    // other camera artifacts stay internal (CameraPoseTracker's own
+    // implementation detail), so they stay `implementation`.
+    api(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)

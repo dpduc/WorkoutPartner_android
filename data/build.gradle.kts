@@ -50,17 +50,25 @@ ksp {
 }
 
 dependencies {
-    implementation(project(":core-rep-counting"))
+    // core-rep-counting's Exercise is part of this module's own public API
+    // (every entity/DAO signature that touches Exercise), so it's `api`,
+    // not `implementation` — a downstream consumer (`app`) needs it on its
+    // own compile classpath to call those signatures at all.
+    api(project(":core-rep-counting"))
     implementation(project(":core-streaks"))
 
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
+    // `api`, not `implementation`: WorkoutPartnerDatabase/the DAOs are this
+    // module's public surface, and RoomDatabase is their supertype — a
+    // downstream consumer (`app`) needs Room's own classes on its compile
+    // classpath to reference them at all, not just at runtime.
+    api(libs.androidx.room.runtime)
+    api(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
-    implementation(libs.kotlinx.coroutines.android)
+    api(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
