@@ -23,6 +23,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +35,12 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.workoutpartner.app.data.BundledRoutines
 import com.workoutpartner.app.di.AppContainer
+import com.workoutpartner.app.onboarding.DisclaimerScreen
+import com.workoutpartner.app.onboarding.GuestConversionDialog
+import com.workoutpartner.app.onboarding.OnboardingPrefs
+import com.workoutpartner.app.onboarding.SignInScreen
+import com.workoutpartner.app.onboarding.SignUpScreen
+import com.workoutpartner.app.onboarding.WelcomeScreen
 import com.workoutpartner.app.progress.ProgressScreen
 import com.workoutpartner.app.quickcount.QuickCountRunScreen
 import com.workoutpartner.app.quickcount.QuickCountSetupScreen
@@ -42,7 +49,9 @@ import com.workoutpartner.app.quickcount.TallyHistoryScreen
 import com.workoutpartner.app.session.RoutinePickerScreen
 import com.workoutpartner.app.session.SessionScreen
 import com.workoutpartner.app.ui.theme.WorkoutPartnerTheme
+import com.workoutpartner.data.AuthState
 import com.workoutpartner.data.RoutineWithSteps
+import kotlinx.coroutines.flow.flowOf
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,23 +67,43 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * The app's root composable (ticket 09 onward): seeds the bundled Routines
- * on first run, gates the Session flow behind the Camera runtime permission
- * (declared in the manifest since ticket 01, requested here since it's the
- * first ticket that actually needs it), best-effort requests the
- * notification permission ticket 12's daily reminder needs on Android 13+,
- * and switches over [AppScreen].
+ * The app's root composable: safety disclaimer -> "how do you want to
+ * start" (Guest/Sign up/Sign in) on first launch only (ticket 13, spec.md
+ * stories 1, 22), persisted via [OnboardingPrefs] so returning users skip
+ * straight to [AppScreen.RoutinePicker]; seeds the bundled Routines on
+ * first run; gates the Session/Quick Count flows behind the Camera runtime
+ * permission; best-effort requests the notification permission ticket 12's
+ * daily reminder needs on Android 13+; and switches over [AppScreen].
  *
- * Guest by default (`accountId = null`) until ticket 13 wires in real
- * Guest-vs-signed-in state from `AuthRepository.authState` — out of this
- * ticket's scope.
+ * `accountId` is real Guest-vs-Account state (ticket 13), derived from
+ * [com.workoutpartner.data.AuthRepository.authState] — not the hardcoded
+ * `null` earlier tickets used as a placeholder.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutPartnerApp(container: AppContainer) {
-    var screen by remember { mutableStateOf<AppScreen>(AppScreen.RoutinePicker) }
+    val context = LocalContext.current
+    val prefs = remember { OnboardingPrefs(context) }
+    var screen by remember {
+        mutableStateOf<AppScreen>(
+            when {
+                !prefs.hasSeenDisclaimer -> AppScreen.Disclaimer
+                !prefs.hasChosenHowToStart -> AppScreen.Welcome
+                else -> AppScreen.RoutinePicker
+            },
+        )
+    }
     var routines by remember { mutableStateOf<List<RoutineWithSteps>>(emptyList()) }
-    val accountId: String? = null
+    var showGuestConversionPrompt by remember { mutableStateOf(false) }
+
+    // container.authRepository is null if Firebase isn't configured yet
+    // (still no google-services.json — ticket 01/07's disclosed gap; see
+    // AppContainer's doc comment for why that's handled there, not here).
+    // Falls back to Guest behavior instead of crashing; Sign up/Sign in
+    // stay genuinely unavailable until that file lands.
+    val authRepository = container.authRepository
+    val authState by (authRepository?.authState ?: flowOf(AuthState.Guest)).collectAsState(initial = AuthState.Guest)
+    val accountId = (authState as? AuthState.SignedIn)?.accountId
 
     LaunchedEffect(Unit) {
         BundledRoutines.seedIfEmpty(container.database.routineDao())
@@ -84,6 +113,41 @@ fun WorkoutPartnerApp(container: AppContainer) {
     NotificationPermissionRequester()
 
     when (val current = screen) {
+        AppScreen.Disclaimer -> DisclaimerScreen(
+            onAcknowledge = {
+                prefs.hasSeenDisclaimer = true
+                screen = if (prefs.hasChosenHowToStart) AppScreen.RoutinePicker else AppScreen.Welcome
+            },
+        )
+        AppScreen.Welcome -> WelcomeScreen(
+            onContinueAsGuest = { prefs.hasChosenHowToStart = true; screen = AppScreen.RoutinePicker },
+            onSignUp = { screen = AppScreen.SignUp },
+            onSignIn = { screen = AppScreen.SignIn },
+        )
+        AppScreen.SignUp -> {
+            val repo = authRepository
+            if (repo == null) {
+                AuthUnavailableScreen(onBack = { screen = AppScreen.Welcome })
+            } else {
+                SignUpScreen(
+                    authRepository = repo,
+                    onSignedUp = { prefs.hasChosenHowToStart = true; screen = AppScreen.RoutinePicker },
+                    onCancel = { screen = AppScreen.Welcome },
+                )
+            }
+        }
+        AppScreen.SignIn -> {
+            val repo = authRepository
+            if (repo == null) {
+                AuthUnavailableScreen(onBack = { screen = AppScreen.Welcome })
+            } else {
+                SignInScreen(
+                    authRepository = repo,
+                    onSignedIn = { prefs.hasChosenHowToStart = true; screen = AppScreen.RoutinePicker },
+                    onCancel = { screen = AppScreen.Welcome },
+                )
+            }
+        }
         AppScreen.RoutinePicker -> Scaffold(
             topBar = {
                 TopAppBar(
@@ -95,6 +159,8 @@ fun WorkoutPartnerApp(container: AppContainer) {
                         // accountId == null gating as Progress.
                         if (accountId != null) {
                             TextButton(onClick = { screen = AppScreen.Roster }) { Text("Roster") }
+                        } else {
+                            TextButton(onClick = { screen = AppScreen.SignUp }) { Text("Sign up") }
                         }
                     },
                 )
@@ -106,15 +172,35 @@ fun WorkoutPartnerApp(container: AppContainer) {
                 modifier = Modifier.padding(padding),
             )
         }
-        is AppScreen.Session -> CameraPermissionGate {
-            SessionScreen(
-                routine = current.routine,
-                accountId = accountId,
-                setRepository = container.setRepository,
-                accountRepository = container.accountRepository,
-                poseTrackerFactory = container::createPoseTracker,
-                onSessionComplete = { screen = AppScreen.RoutinePicker },
-            )
+        is AppScreen.Session -> {
+            // Shown at most once per Session (not once per Set — spec
+            // story 3 asks for the prompt "after finishing a Set," but
+            // re-showing it after every Set in a multi-Set Routine would
+            // be a nag, not a nudge). Fresh `remember` per new Session
+            // screen instance, since Compose leaves and re-enters this
+            // branch's composition each time a Session starts.
+            var hasShownGuestPromptThisSession by remember { mutableStateOf(false) }
+
+            CameraPermissionGate {
+                SessionScreen(
+                    routine = current.routine,
+                    accountId = accountId,
+                    setRepository = container.setRepository,
+                    accountRepository = container.accountRepository,
+                    poseTrackerFactory = container::createPoseTracker,
+                    onSetFinished = {
+                        // The post-Set prompt to create an Account while
+                        // still a Guest (ticket 13, spec.md story 3) — this
+                        // hook, not the Session flow itself (ticket 09's own
+                        // scope boundary).
+                        if (accountId == null && !hasShownGuestPromptThisSession) {
+                            showGuestConversionPrompt = true
+                            hasShownGuestPromptThisSession = true
+                        }
+                    },
+                    onSessionComplete = { screen = AppScreen.RoutinePicker },
+                )
+            }
         }
         AppScreen.Progress -> Scaffold(
             topBar = {
@@ -180,6 +266,25 @@ fun WorkoutPartnerApp(container: AppContainer) {
                 tallyRepository = container.tallyRepository,
                 modifier = Modifier.padding(padding),
             )
+        }
+    }
+
+    if (showGuestConversionPrompt) {
+        GuestConversionDialog(
+            onSignUp = { showGuestConversionPrompt = false; screen = AppScreen.SignUp },
+            onDismiss = { showGuestConversionPrompt = false },
+        )
+    }
+}
+
+@Composable
+private fun AuthUnavailableScreen(onBack: () -> Unit) {
+    Surface(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Sign-up/sign-in isn't available on this build yet.", style = MaterialTheme.typography.bodyLarge)
+                TextButton(onClick = onBack, modifier = Modifier.padding(top = 16.dp)) { Text("Back") }
+            }
         }
     }
 }

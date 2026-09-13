@@ -60,8 +60,11 @@ fun RoutinePickerScreen(routines: List<RoutineWithSteps>, onRoutineSelected: (Ro
  * Hosts [SessionViewModel] and switches between the phases spec.md's
  * "Specific interactions" describes. [onSessionComplete] fires once the
  * Session summary is dismissed — ticket 13 wires this to the Guest ->
- * Account prompt when [accountId] is null (spec.md user story 3); that
- * prompt itself is out of this ticket's scope.
+ * Account prompt when [accountId] is null (spec.md user story 3) — that
+ * prompt's own UI is out of this ticket's scope, but [onSetFinished] is the
+ * trigger point ticket 13 hooks into: story 3 says "after finishing **a
+ * Set**," not after the whole Session, so it fires once per completed Set
+ * (when its summary is acknowledged), not just once at [onSessionComplete].
  */
 @Composable
 fun SessionScreen(
@@ -70,6 +73,7 @@ fun SessionScreen(
     setRepository: SetRepository,
     accountRepository: AccountRepository,
     poseTrackerFactory: () -> PoseTracker,
+    onSetFinished: () -> Unit = {},
     onSessionComplete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -87,7 +91,13 @@ fun SessionScreen(
         when (val current = phase) {
             is SessionPhase.Countdown -> CountdownContent(current)
             is SessionPhase.Tracking -> TrackingContent(current, viewModel::startCamera, onFinishSet = viewModel::finishSet)
-            is SessionPhase.SetSummary -> SetSummaryContent(current, onContinue = viewModel::acknowledgeSetSummary)
+            is SessionPhase.SetSummary -> SetSummaryContent(
+                current,
+                onContinue = {
+                    onSetFinished()
+                    viewModel.acknowledgeSetSummary()
+                },
+            )
             is SessionPhase.Resting -> RestingContent(current, onSkip = viewModel::skipRest)
             is SessionPhase.SessionComplete -> SessionSummaryContent(current, account?.currentStreak, account?.weeklyTarget, onDone = onSessionComplete)
         }

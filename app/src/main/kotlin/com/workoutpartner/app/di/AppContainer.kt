@@ -32,6 +32,16 @@ import com.workoutpartner.data.createDatabase
  * means the app can launch and use everything Room-backed (Sessions, Sets,
  * Roster, Tallies) without crashing at startup; only actually signing in or
  * syncing touches Firebase, and will fail until that file lands.
+ *
+ * [authRepository] is nullable for the same reason, one level up: ticket 13
+ * first guarded this at its own call site in `MainActivity` with a
+ * `runCatching`, but every consumer would have had to remember to re-wrap
+ * it the same way — `/code-review` flagged this as the kind of thing that
+ * belongs in the one place that already owns "who touches Firebase and
+ * when." Caught here instead, `by lazy` permanently memoizes the resulting
+ * `null` (the failure never escapes the lazy block, so it's not retried on
+ * next access, unlike a bare `by lazy { FirebaseAuthGateway(...) }` would
+ * be if it kept throwing).
  */
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
@@ -47,8 +57,10 @@ class AppContainer(context: Context) {
     val remoteSyncGateway: RemoteSyncGateway by lazy { FirestoreSyncGateway(FirebaseFirestore.getInstance()) }
 
     val guestAccountMigration = GuestAccountMigration(accountRepository)
-    val authRepository: AuthRepository by lazy {
-        AuthRepository(authGateway, accountRepository, onGuestDataToMigrate = guestAccountMigration::invoke)
+
+    /** Null if constructing the Firebase-backed auth stack failed (no `google-services.json` yet) — see this class's doc comment. Sign-up/sign-in are genuinely unavailable until that's provisioned; callers should treat null as "not available right now," not crash. */
+    val authRepository: AuthRepository? by lazy {
+        runCatching { AuthRepository(authGateway, accountRepository, onGuestDataToMigrate = guestAccountMigration::invoke) }.getOrNull()
     }
 
     val syncEngine: SyncEngine by lazy {

@@ -16,6 +16,10 @@ import com.workoutpartner.data.TrackedProfileEntity
  * screens alongside it.
  */
 sealed interface AppScreen {
+    data object Disclaimer : AppScreen
+    data object Welcome : AppScreen
+    data object SignUp : AppScreen
+    data object SignIn : AppScreen
     data object RoutinePicker : AppScreen
     data class Session(val routine: RoutineWithSteps) : AppScreen
     data object Progress : AppScreen
