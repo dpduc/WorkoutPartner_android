@@ -5,11 +5,12 @@ import com.workoutpartner.core.repcounting.Exercise
 import java.time.Instant
 
 /**
- * Room TypeConverters for the two non-primitive types this schema's columns
- * use: [Instant] timestamps (stored as epoch millis) and core-rep-counting's
- * [Exercise] enum (stored by name) — [Exercise] is reused directly rather
- * than duplicated into a parallel `data`-module enum, the same shared-
- * vocabulary pattern ticket 03 used for Landmark/PoseLandmarkFrame.
+ * Room TypeConverters for this schema's non-primitive column types:
+ * [Instant] timestamps (stored as epoch millis), core-rep-counting's
+ * [Exercise] enum (stored by name, reused directly rather than duplicated
+ * into a parallel `data`-module enum — the same shared-vocabulary pattern
+ * ticket 03 used for Landmark/PoseLandmarkFrame), and this module's own
+ * [SyncEntityKind] (ticket 06), also stored by name.
  */
 object Converters {
     @TypeConverter
@@ -23,4 +24,10 @@ object Converters {
 
     @TypeConverter
     fun nameToExercise(name: String?): Exercise? = name?.let(Exercise::valueOf)
+
+    @TypeConverter
+    fun syncEntityKindToName(kind: SyncEntityKind?): String? = kind?.name
+
+    @TypeConverter
+    fun nameToSyncEntityKind(name: String?): SyncEntityKind? = name?.let(SyncEntityKind::valueOf)
 }

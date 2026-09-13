@@ -5,10 +5,10 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
 /**
- * The Room schema for spec.md's conceptual data model (ticket 05). Building
- * this into a real, injectable database instance (and everything that reads
- * or writes through it) is the repository layer's job — Seam 3, ticket 06.
- * This class and its DAOs are schema only.
+ * The Room schema for spec.md's conceptual data model (ticket 05) plus the
+ * offline-sync outbox (ticket 06's [PendingSyncEntity]). [createDatabase]
+ * builds a real, on-disk instance; the repository classes (ticket 06) are
+ * everything that reads or writes through it.
  */
 @Database(
     entities = [
@@ -19,8 +19,9 @@ import androidx.room.TypeConverters
         SetEntity::class,
         TrackedProfileEntity::class,
         TallyEntity::class,
+        PendingSyncEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -31,4 +32,5 @@ abstract class WorkoutPartnerDatabase : RoomDatabase() {
     abstract fun setDao(): SetDao
     abstract fun trackedProfileDao(): TrackedProfileDao
     abstract fun tallyDao(): TallyDao
+    abstract fun pendingSyncDao(): PendingSyncDao
 }

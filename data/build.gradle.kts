@@ -9,6 +9,13 @@
 // RoutineStepEntity/TallyEntity rather than duplicated — same shared-
 // vocabulary pattern ticket 03 used) and core-streaks (AccountEntity's
 // default Weekly Target).
+//
+// Ticket 06 (repository layer/offline sync) added Robolectric: spec.md's
+// Testing Decisions call for "tests against an in-memory Room database and
+// a fake remote" for this seam specifically (unlike ticket 05's schema,
+// which had no testing requirement of its own) — Robolectric is what makes
+// a real (if in-memory) Room database runnable as a plain JVM unit test,
+// without an emulator/device.
 plugins {
     alias(libs.plugins.android.library)
     // Kotlin compilation comes from AGP's built-in Kotlin support (AGP 9+);
@@ -27,6 +34,12 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
     }
 }
 
@@ -51,6 +64,8 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.kotlinx.coroutines.test)
 }

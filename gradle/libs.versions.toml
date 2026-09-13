@@ -21,6 +21,10 @@ ksp = "2.3.12"
 junit = "4.13.2"
 androidxTestExtJunit = "1.3.0"
 espressoCore = "3.7.0"
+# Lets Room DAO tests run as plain JVM unit tests (in-memory DB) without an
+# emulator/device — first needed by ticket 06's Seam 3 tests. 4.16.1 is
+# current; pin @Config(sdk=...) to a level within its supported range.
+robolectric = "4.16.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -59,6 +63,7 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
 androidx-test-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
