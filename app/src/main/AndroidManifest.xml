@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- CameraX front-camera capture, needed once core-pose-tracking wires
          into the UI (ticket 09/11) — declared here now since it's an
@@ -8,6 +9,11 @@
     <uses-feature
         android:name="android.hardware.camera"
         android:required="true" />
+
+    <!-- Ticket 12: the daily reminder notification. Required at runtime on
+         Android 13+ (API 33) for any app targeting it to post notifications
+         at all — requested from MainActivity, same pattern as CAMERA. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".WorkoutPartnerApplication"
@@ -26,6 +32,23 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Ticket 12: WorkManager's default auto-initializer runs before
+             Application.onCreate() (a ContentProvider's onCreate() runs
+             first), too early for AppContainer/WorkoutPartnerWorkerFactory
+             to exist yet — disabled so WorkoutPartnerApplication can call
+             WorkManager.initialize(...) itself once the container is
+             actually built. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 
 </manifest>

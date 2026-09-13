@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Workout Partner</string>
+
+    <!-- Ticket 12: streak-aware daily reminder. Content/copy beyond this
+         simple reminder is explicitly out of this ticket's scope. -->
+    <string name="reminder_channel_name">Daily Streak Reminder</string>
+    <string name="reminder_notification_title">Keep your Streak going</string>
+    <string name="reminder_notification_text">You haven\'t logged an Active Day yet this week.</string>
 </resources>

@@ -2,6 +2,7 @@ package com.workoutpartner.app
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -60,7 +61,9 @@ class MainActivity : ComponentActivity() {
  * The app's root composable (ticket 09 onward): seeds the bundled Routines
  * on first run, gates the Session flow behind the Camera runtime permission
  * (declared in the manifest since ticket 01, requested here since it's the
- * first ticket that actually needs it), and switches over [AppScreen].
+ * first ticket that actually needs it), best-effort requests the
+ * notification permission ticket 12's daily reminder needs on Android 13+,
+ * and switches over [AppScreen].
  *
  * Guest by default (`accountId = null`) until ticket 13 wires in real
  * Guest-vs-signed-in state from `AuthRepository.authState` — out of this
@@ -77,6 +80,8 @@ fun WorkoutPartnerApp(container: AppContainer) {
         BundledRoutines.seedIfEmpty(container.database.routineDao())
         routines = container.database.routineDao().getAllRoutinesWithSteps()
     }
+
+    NotificationPermissionRequester()
 
     when (val current = screen) {
         AppScreen.RoutinePicker -> Scaffold(
@@ -175,6 +180,27 @@ fun WorkoutPartnerApp(container: AppContainer) {
                 tallyRepository = container.tallyRepository,
                 modifier = Modifier.padding(padding),
             )
+        }
+    }
+}
+
+/**
+ * Best-effort requests the POST_NOTIFICATIONS permission (ticket 12) once,
+ * on Android 13+ where it's required at all. Unlike [CameraPermissionGate],
+ * this doesn't block anything — the daily reminder is a background,
+ * non-critical feature (this ticket's own scope: "no push/FCM... a simple
+ * reminder"), so there's no screen worth withholding over a denial; the
+ * Worker itself checks the permission again before posting and silently
+ * skips if it's still not granted.
+ */
+@Composable
+private fun NotificationPermissionRequester() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    LaunchedEffect(Unit) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 }
