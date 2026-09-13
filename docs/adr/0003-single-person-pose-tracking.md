@@ -1,0 +1,3 @@
+# Single person in frame at a time, v1
+
+Quick Count exists because tracking a whole group by hand is tedious, which invites the assumption that the app should track everyone in frame simultaneously. We chose MediaPipe's standard Pose Landmarker, which tracks one person at a time, over building or integrating a multi-person pose pipeline — multi-person pose estimation is a materially different, heavier technical effort (per-person detection, tracking, re-identification across frames), not an incremental extension of the single-person case. Quick Count's UX follows from this: one Tracked Profile is active in frame at a time, and the next person steps up once the current Tally is saved. Moving to multi-person later means replacing the tracking pipeline, not extending it.

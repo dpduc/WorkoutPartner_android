@@ -1,0 +1,3 @@
+# All camera-based pose tracking lives in the Android app; Web is a companion dashboard
+
+With two separate client projects sharing one backend, it's not obvious from the Web side alone why it can't also run workouts. We chose to keep MediaPipe-based pose tracking, rep counting, and Form Scoring exclusively in the Android app, with Web scoped to Accounts, history, and Streaks only — porting pose tracking to a browser webcam flow is a distinct engineering effort (different camera APIs, different framing and performance characteristics) and would mean maintaining the rep-counting logic in two places. Web only ever reads and displays data that Android produced and synced through Firestore.

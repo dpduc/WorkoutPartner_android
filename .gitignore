@@ -1,0 +1,28 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+# Log Files
+*.log
+# Android Studio Navigation editor temp files
+.navigation/
+# Android Studio captures folder
+captures/
+# IntelliJ
+*.iws
+# Keystore files
+*.jks
+*.keystore
+# Google Services (Firebase) config, per-developer/per-environment
+google-services.json

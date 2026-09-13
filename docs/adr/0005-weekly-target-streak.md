@@ -1,0 +1,3 @@
+# Streak is weekly-target-based, not daily
+
+The Duolingo comparison invites the assumption of a daily streak, but exercise has more friction than a five-minute language lesson, and a strict daily requirement would punish normal rest days. We chose a Weekly Target (Active Days per week, default 3) with a Streak Shield earned by meeting that target, over a plain consecutive-day streak, so the mechanic rewards a realistic weekly rhythm instead of demanding every single day. A same-week gap rule (a run of consecutive zero-activity days breaks the Streak regardless of the weekly count) is layered on top specifically to stop someone cramming all their Active Days at the end of the week and still calling it consistent.

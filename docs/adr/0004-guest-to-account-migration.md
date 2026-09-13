@@ -1,0 +1,3 @@
+# Guest data persists locally and migrates on sign-up
+
+A Guest doing a real workout shouldn't lose it just because they haven't decided to create an Account yet — so Guest Sets and Tallies are written to Room like an Account's would be, not held in memory only. We chose local persistence with migration into Firestore at sign-up time, over fully ephemeral Guest data, even though it means the data layer must support ownerless local records and a one-time "claim" step that uploads and re-owns them. The alternative (ephemeral guest mode) is simpler to build but undercuts the entire point of letting someone try the app before committing to an Account.
