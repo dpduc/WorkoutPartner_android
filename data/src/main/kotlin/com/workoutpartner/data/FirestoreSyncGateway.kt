@@ -22,9 +22,9 @@ import kotlinx.coroutines.CancellationException
  */
 class FirestoreSyncGateway(private val firestore: FirebaseFirestore) : RemoteSyncGateway {
 
-    override suspend fun pushSet(set: SetEntity): Boolean = push(SETS_COLLECTION, set.id, set.toFirestoreMap())
+    override suspend fun pushSet(set: SetEntity, accountId: String): Boolean = push(SETS_COLLECTION, set.id, set.toFirestoreMap(accountId))
 
-    override suspend fun pushTally(tally: TallyEntity): Boolean = push(TALLIES_COLLECTION, tally.id, tally.toFirestoreMap())
+    override suspend fun pushTally(tally: TallyEntity, accountId: String): Boolean = push(TALLIES_COLLECTION, tally.id, tally.toFirestoreMap(accountId))
 
     private suspend fun push(collection: String, documentId: String, data: Map<String, Any?>): Boolean =
         try {

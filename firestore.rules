@@ -1,0 +1,129 @@
+// Firestore security rules (ticket 14) — formalizes ADR-0001 (Firestore
+// collections mirror the Room schema) and ADR-0006 (Android is the only
+// writer of an Account's own data; the Web project only reads) as an
+// enforced contract, not just client-side convention.
+//
+// Not verified against a live Firestore project/emulator in this session —
+// no Firebase project exists yet (ticket 01/07's disclosed
+// `google-services.json` gap; this file also has no `firebase.json`
+// pointing at a real project id to deploy it with). Written for real,
+// unverified end-to-end, the same disclosure as ticket 03's
+// CameraPoseTracker / ticket 06's FirestoreSyncGateway.
+//
+// ## A known, disclosed limitation: "Android-only" isn't fully enforceable
+//
+// This ticket's own wording asks for "reject any write attempt from
+// outside the owning Account's Android client." Firestore security rules
+// see an authenticated `request.auth.uid` and the request's data — they
+// have no notion of *which client platform* sent the request. Without a
+// custom Auth claim minted server-side (a Cloud Function using the Admin
+// SDK, e.g. tagging Android-signed-in sessions with a `platform: "android"`
+// claim) — infrastructure that doesn't exist anywhere in this project —
+// there is no way to distinguish "the Web app, signed in as this Account"
+// from "the Android app, signed in as this Account" at the rules layer.
+// What *is* enforced, and is the meaningful security property Firestore
+// can actually express: nobody but the authenticated owner of an Account's
+// data can read it, Sets/Tallies can only ever be created (never edited or
+// deleted — SyncEngine's own doc comment: "an immutable, append-only
+// fact"), and — precisely *because* "the owner" can't be narrowed to "the
+// owner's Android client" — Accounts/Sessions/Tracked Profiles stay
+// read-only for everyone below, rather than granting `write` to "the
+// authenticated owner" and letting a Web session signed in as that same
+// Account rewrite its own Account state (exactly what ADR-0006 rules out).
+// If literal per-platform write enforcement is ever required for those
+// collections, it needs the custom-claims piece built first — flagged here
+// rather than silently claimed as already solved.
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // The one ownership check every collection below is built on: only
+    // the Account itself (its Firebase Auth uid, per ticket 07) can read
+    // or write its own data.
+    function ownsAccount(accountId) {
+      return isSignedIn() && request.auth.uid == accountId;
+    }
+
+    // Sets (ticket 05 schema; ticket 06/14 sync — field list matches
+    // SetEntity.toFirestoreMap()). Immutable, append-only per SyncEngine's
+    // doc comment: no update/delete path for anyone, Android included —
+    // "editing" a Set isn't a feature this app has.
+    match /sets/{setId} {
+      allow read: if ownsAccount(resource.data.accountId);
+      allow create: if ownsAccount(request.resource.data.accountId)
+        && request.resource.data.keys().hasOnly(
+             ['id', 'accountId', 'sessionId', 'exercise', 'targetReps', 'actualReps', 'formScore', 'goodSet', 'timestamp']
+           )
+        && request.resource.data.id is string
+        && request.resource.data.sessionId is string
+        && request.resource.data.exercise is string
+        && request.resource.data.targetReps is int
+        && request.resource.data.actualReps is int
+        && request.resource.data.formScore is int
+        && request.resource.data.goodSet is bool
+        && request.resource.data.timestamp is timestamp;
+      allow update, delete: if false;
+    }
+
+    // Tallies (ticket 05 schema; ticket 06/14 sync — field list matches
+    // TallyEntity.toFirestoreMap()). Same immutable-fact shape as Sets;
+    // never carries a Form Score (CONTEXT.md's Tally definition).
+    match /tallies/{tallyId} {
+      allow read: if ownsAccount(resource.data.accountId);
+      allow create: if ownsAccount(request.resource.data.accountId)
+        && request.resource.data.keys().hasOnly(
+             ['id', 'accountId', 'trackedProfileId', 'exercise', 'repsAchieved', 'target', 'timestamp']
+           )
+        && request.resource.data.id is string
+        && request.resource.data.trackedProfileId is string
+        && request.resource.data.exercise is string
+        && request.resource.data.repsAchieved is int
+        && (request.resource.data.target == null || request.resource.data.target is int)
+        && request.resource.data.timestamp is timestamp;
+      allow update, delete: if false;
+    }
+
+    // Accounts, Sessions, and Tracked Profiles / Roster (ticket 05 schema).
+    // Ticket 06 doesn't actually push these collections yet — a disclosed
+    // gap in SyncEngine's own doc comment — so read-only for now, for
+    // everyone, including the owning Account: unlike Sets/Tallies (create-
+    // only, immutable facts — a forged extra Set is a low-value target),
+    // these are exactly the mutable Account state ADR-0006 says only
+    // Android should ever change (weeklyTarget, Streak, notification
+    // preference, Roster membership). Without a platform-distinguishing
+    // mechanism (a custom Auth claim minted server-side — no such
+    // infrastructure exists in this project), granting `write` to "the
+    // authenticated owner" would just as easily let a Web session signed
+    // in as that same Account rewrite its own Account state, which is
+    // exactly what ADR-0006 rules out. Since nothing writes these
+    // collections yet regardless, there's no reason to grant that access
+    // before a real write path — and a real enforcement answer for it —
+    // exists; a later ticket revisits this once one does.
+    match /accounts/{accountId} {
+      allow read: if ownsAccount(accountId);
+      allow write: if false;
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if ownsAccount(resource.data.accountId);
+      allow write: if false;
+    }
+
+    match /trackedProfiles/{profileId} {
+      allow read: if ownsAccount(resource.data.accountId);
+      allow write: if false;
+    }
+
+    // Everything else: denied. Firestore already defaults to deny for any
+    // path with no matching rule above — this is just stating that intent
+    // explicitly rather than leaving it implicit.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

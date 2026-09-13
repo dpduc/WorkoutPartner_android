@@ -7,9 +7,17 @@ import com.google.firebase.Timestamp
  * [FirestoreSyncGateway]. [Instant] becomes a Firestore [Timestamp] (its
  * native, query/sort-friendly time type) and [Exercise] becomes its name —
  * mirroring how [Converters] handles the same two types for Room.
+ *
+ * [accountId] is stamped onto every document (ticket 14) even though
+ * neither [SetEntity] nor [TallyEntity] carries it in Room — Room derives
+ * ownership through [SessionEntity]/[TrackedProfileEntity] instead, but
+ * Firestore's security rules (ticket 14) need it directly on the document
+ * they're evaluating, not via a join Firestore rules can't easily express
+ * for that access pattern.
  */
-fun SetEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
+fun SetEntity.toFirestoreMap(accountId: String): Map<String, Any?> = mapOf(
     "id" to id,
+    "accountId" to accountId,
     "sessionId" to sessionId,
     "exercise" to exercise.name,
     "targetReps" to targetReps,
@@ -19,8 +27,9 @@ fun SetEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
     "timestamp" to Timestamp(timestamp.epochSecond, timestamp.nano),
 )
 
-fun TallyEntity.toFirestoreMap(): Map<String, Any?> = mapOf(
+fun TallyEntity.toFirestoreMap(accountId: String): Map<String, Any?> = mapOf(
     "id" to id,
+    "accountId" to accountId,
     "trackedProfileId" to trackedProfileId,
     "exercise" to exercise.name,
     "repsAchieved" to repsAchieved,

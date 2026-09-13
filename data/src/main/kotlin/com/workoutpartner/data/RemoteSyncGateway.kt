@@ -12,6 +12,12 @@ package com.workoutpartner.data
  * appending — see [SyncEngine]'s doc comment for why this is what makes
  * two-device reconciliation additive by construction.
  *
+ * [accountId] is the resolved owning Account — [SyncEngine] only ever calls
+ * these once it has one (ticket 14: a Set/Tally is never pushed while still
+ * Guest-owned), and it's stamped onto the document so Firestore security
+ * rules (ticket 14) can actually check "does this write's caller own this
+ * document," not just trust client-side convention.
+ *
  * Returns `false` (not a thrown exception) for "try again later": both "no
  * connectivity" and "a transient remote error" look the same to
  * [SyncEngine] — it just leaves the item queued either way. An
@@ -20,7 +26,7 @@ package com.workoutpartner.data
  * network failure.
  */
 interface RemoteSyncGateway {
-    suspend fun pushSet(set: SetEntity): Boolean
+    suspend fun pushSet(set: SetEntity, accountId: String): Boolean
 
-    suspend fun pushTally(tally: TallyEntity): Boolean
+    suspend fun pushTally(tally: TallyEntity, accountId: String): Boolean
 }

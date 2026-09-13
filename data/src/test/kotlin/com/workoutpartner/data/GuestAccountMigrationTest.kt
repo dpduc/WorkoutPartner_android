@@ -40,7 +40,7 @@ class GuestAccountMigrationTest {
     private val authGateway = FakeAuthGateway()
     private val authRepository = AuthRepository(authGateway, accountRepository, onGuestDataToMigrate = migration::invoke)
     private val remote = FakeRemoteSyncGateway()
-    private val syncEngine = SyncEngine(db.pendingSyncDao(), db.setDao(), db.tallyDao(), remote)
+    private val syncEngine = SyncEngine(db.pendingSyncDao(), db.setDao(), db.tallyDao(), db.sessionDao(), db.trackedProfileDao(), remote)
 
     @Test
     fun `signing up as a Guest with local history migrates it, leaving no unclaimed data behind`() = runTest {

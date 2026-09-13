@@ -64,7 +64,14 @@ class AppContainer(context: Context) {
     }
 
     val syncEngine: SyncEngine by lazy {
-        SyncEngine(database.pendingSyncDao(), database.setDao(), database.tallyDao(), remoteSyncGateway)
+        SyncEngine(
+            database.pendingSyncDao(),
+            database.setDao(),
+            database.tallyDao(),
+            database.sessionDao(),
+            database.trackedProfileDao(),
+            remoteSyncGateway,
+        )
     }
 
     /**
