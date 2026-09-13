@@ -16,4 +16,5 @@ import com.workoutpartner.data.RoutineWithSteps
 sealed interface AppScreen {
     data object RoutinePicker : AppScreen
     data class Session(val routine: RoutineWithSteps) : AppScreen
+    data object Progress : AppScreen
 }

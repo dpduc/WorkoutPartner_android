@@ -9,12 +9,17 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,10 +28,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.workoutpartner.app.data.BundledRoutines
 import com.workoutpartner.app.di.AppContainer
+import com.workoutpartner.app.progress.ProgressScreen
 import com.workoutpartner.app.session.RoutinePickerScreen
 import com.workoutpartner.app.session.SessionScreen
 import com.workoutpartner.app.ui.theme.WorkoutPartnerTheme
@@ -55,6 +62,7 @@ class MainActivity : ComponentActivity() {
  * Guest-vs-signed-in state from `AuthRepository.authState` — out of this
  * ticket's scope.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutPartnerApp(container: AppContainer) {
     var screen by remember { mutableStateOf<AppScreen>(AppScreen.RoutinePicker) }
@@ -67,10 +75,20 @@ fun WorkoutPartnerApp(container: AppContainer) {
     }
 
     when (val current = screen) {
-        AppScreen.RoutinePicker -> RoutinePickerScreen(
-            routines = routines,
-            onRoutineSelected = { screen = AppScreen.Session(it) },
-        )
+        AppScreen.RoutinePicker -> Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Workout Partner") },
+                    actions = { TextButton(onClick = { screen = AppScreen.Progress }) { Text("Progress") } },
+                )
+            },
+        ) { padding ->
+            RoutinePickerScreen(
+                routines = routines,
+                onRoutineSelected = { screen = AppScreen.Session(it) },
+                modifier = Modifier.padding(padding),
+            )
+        }
         is AppScreen.Session -> CameraPermissionGate {
             SessionScreen(
                 routine = current.routine,
@@ -81,13 +99,28 @@ fun WorkoutPartnerApp(container: AppContainer) {
                 onSessionComplete = { screen = AppScreen.RoutinePicker },
             )
         }
+        AppScreen.Progress -> Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Progress") },
+                    navigationIcon = { TextButton(onClick = { screen = AppScreen.RoutinePicker }) { Text("Back") } },
+                )
+            },
+        ) { padding ->
+            ProgressScreen(
+                accountId = accountId,
+                accountRepository = container.accountRepository,
+                setRepository = container.setRepository,
+                modifier = Modifier.padding(padding),
+            )
+        }
     }
 }
 
 /** Requests the Camera permission (manifest-declared since ticket 01) before showing anything that needs it, per Android's runtime-permission model. */
 @Composable
 private fun CameraPermissionGate(content: @Composable () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     var granted by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
@@ -102,7 +135,7 @@ private fun CameraPermissionGate(content: @Composable () -> Unit) {
     } else {
         Surface(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Camera access is needed to track your Reps.", style = MaterialTheme.typography.bodyLarge)
                     Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }, modifier = Modifier.padding(top = 16.dp)) {
                         Text("Grant camera access")
