@@ -10,6 +10,9 @@ plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.google.services) apply false
+    // KSP: Room's annotation processor, applied where there are @Entity/@Dao
+    // classes to generate code from — first needed by ticket 05's data module.
+    alias(libs.plugins.ksp) apply false
 }
 
 // Every module (Android or pure-Kotlin) targets the same JVM bytecode level.
