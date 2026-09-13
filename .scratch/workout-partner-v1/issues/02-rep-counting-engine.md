@@ -28,3 +28,22 @@ Nothing (deliberately independent of ticket 01's Android modules beyond the modu
 ## Out of scope
 
 Camera/MediaPipe integration (ticket 03), beep/UI feedback (ticket 09), Quick Count's no-Form-Score variant (ticket 11 — reuses this engine).
+
+## Comments
+
+Implemented in commit `d7542cf` (feat: rep counting engine (ticket 02, Seam
+1)). 21 tests passing (`./gradlew :core-rep-counting:test`); full project
+build/tests also green.
+
+Reviewed via `/code-review` against this ticket (Spec: one gap — FormScore
+wasn't exercised end-to-end via the fixtures — closed) and the repo's ADRs/
+CONTEXT.md/spec.md (Standards: no hard violations; four judgement-call
+smells addressed).
+
+Angle thresholds per Exercise are placeholder defaults (see
+`ExerciseProfiles.kt` comments) — expected to be tuned later against real
+device data, per this ticket's own note. Landmark/PoseLandmarkFrame are this
+module's own minimal types, not MediaPipe's — ticket 03 maps onto them.
+
+Ticket 09 (session flow UI) and 11 (quick count) depend on this and are now
+unblocked on this piece (both also need tickets 03 and 06).
