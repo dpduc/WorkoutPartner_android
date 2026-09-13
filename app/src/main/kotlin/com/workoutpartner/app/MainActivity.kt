@@ -34,6 +34,10 @@ import androidx.core.content.ContextCompat
 import com.workoutpartner.app.data.BundledRoutines
 import com.workoutpartner.app.di.AppContainer
 import com.workoutpartner.app.progress.ProgressScreen
+import com.workoutpartner.app.quickcount.QuickCountRunScreen
+import com.workoutpartner.app.quickcount.QuickCountSetupScreen
+import com.workoutpartner.app.quickcount.RosterScreen
+import com.workoutpartner.app.quickcount.TallyHistoryScreen
 import com.workoutpartner.app.session.RoutinePickerScreen
 import com.workoutpartner.app.session.SessionScreen
 import com.workoutpartner.app.ui.theme.WorkoutPartnerTheme
@@ -79,7 +83,15 @@ fun WorkoutPartnerApp(container: AppContainer) {
             topBar = {
                 TopAppBar(
                     title = { Text("Workout Partner") },
-                    actions = { TextButton(onClick = { screen = AppScreen.Progress }) { Text("Progress") } },
+                    actions = {
+                        TextButton(onClick = { screen = AppScreen.Progress }) { Text("Progress") }
+                        // Roster/Quick Count is Account-holder only (spec.md
+                        // stories 34-41) — hidden for a Guest, same
+                        // accountId == null gating as Progress.
+                        if (accountId != null) {
+                            TextButton(onClick = { screen = AppScreen.Roster }) { Text("Roster") }
+                        }
+                    },
                 )
             },
         ) { padding ->
@@ -111,6 +123,56 @@ fun WorkoutPartnerApp(container: AppContainer) {
                 accountId = accountId,
                 accountRepository = container.accountRepository,
                 setRepository = container.setRepository,
+                modifier = Modifier.padding(padding),
+            )
+        }
+        AppScreen.Roster -> {
+            if (accountId == null) {
+                screen = AppScreen.RoutinePicker
+            } else {
+                Scaffold(
+                    topBar = {
+                        TopAppBar(
+                            title = { Text("Roster") },
+                            navigationIcon = { TextButton(onClick = { screen = AppScreen.RoutinePicker }) { Text("Back") } },
+                        )
+                    },
+                ) { padding ->
+                    RosterScreen(
+                        accountId = accountId,
+                        rosterRepository = container.rosterRepository,
+                        onProfileSelected = { screen = AppScreen.QuickCountSetup(it) },
+                        onViewHistory = { screen = AppScreen.TallyHistory(it) },
+                        modifier = Modifier.padding(padding),
+                    )
+                }
+            }
+        }
+        is AppScreen.QuickCountSetup -> QuickCountSetupScreen(
+            profile = current.profile,
+            onStart = { exercise, target -> screen = AppScreen.QuickCountRun(current.profile, exercise, target) },
+        )
+        is AppScreen.QuickCountRun -> CameraPermissionGate {
+            QuickCountRunScreen(
+                trackedProfileId = current.profile.id,
+                exercise = current.exercise,
+                target = current.target,
+                tallyRepository = container.tallyRepository,
+                poseTrackerFactory = container::createPoseTracker,
+                onDone = { screen = AppScreen.Roster },
+            )
+        }
+        is AppScreen.TallyHistory -> Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("History") },
+                    navigationIcon = { TextButton(onClick = { screen = AppScreen.Roster }) { Text("Back") } },
+                )
+            },
+        ) { padding ->
+            TallyHistoryScreen(
+                profile = current.profile,
+                tallyRepository = container.tallyRepository,
                 modifier = Modifier.padding(padding),
             )
         }

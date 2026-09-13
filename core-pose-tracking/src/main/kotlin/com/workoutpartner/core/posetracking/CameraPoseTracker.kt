@@ -115,6 +115,13 @@ class CameraPoseTracker(private val context: Context) : PoseTracker {
         val options = PoseLandmarker.PoseLandmarkerOptions.builder()
             .setBaseOptions(BaseOptions.builder().setModelAssetPath(MODEL_ASSET_PATH).build())
             .setRunningMode(RunningMode.LIVE_STREAM)
+            // ADR-0003: single-person tracking is a deliberate choice, not
+            // an accident of MediaPipe's default — pin it explicitly rather
+            // than leaning on whatever the library's own default happens to
+            // be (ticket 11's review caught this module previously relying
+            // on an unstated default here, with only PoseLandmarkerResultMapping's
+            // `firstOrNull()` as a soft, after-the-fact guard).
+            .setNumPoses(1)
             .setResultListener { result, _ ->
                 val frame = PoseFrameMapper.toPoseLandmarkFrame(result.toRawLandmarks())
                 emitSignal?.invoke(trackingStateMachine.accept(frame))
