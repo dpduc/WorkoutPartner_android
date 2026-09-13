@@ -23,3 +23,18 @@ Nothing — this is the foundation.
 ## Out of scope
 
 Any feature logic. CI/lint config beyond what's needed to build.
+
+## Comments
+
+Implemented in commit `03c707c` (feat: project scaffold (ticket 01)). Verified
+with `./gradlew clean assembleDebug testDebugUnitTest` (BUILD SUCCESSFUL).
+Reviewed via `/code-review` against this ticket (Spec: clean) and the repo's
+ADRs/CONTEXT.md (Standards: one non-blocking duplicated-code smell, fixed).
+
+No emulator/device was available to run the instrumented smoke test
+(`app/src/androidTest/.../MainActivityTest.kt`) or confirm the app visually
+launches — the min-SDK-26 device-matrix caveat from this ticket's spec
+reference still applies. Verify launch on a real device/emulator when
+convenient.
+
+Unblocks tickets 02–14 (project scaffold was their only/first dependency).
