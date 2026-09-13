@@ -1,11 +1,7 @@
 package com.workoutpartner.data
 
-import com.google.android.gms.tasks.Task
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 /**
  * The real [RemoteSyncGateway]: writes to Firestore collections mirroring
@@ -43,11 +39,6 @@ class FirestoreSyncGateway(private val firestore: FirebaseFirestore) : RemoteSyn
             // false instead of throwing.
             false
         }
-
-    private suspend fun <T> Task<T>.awaitResult(): T = suspendCancellableCoroutine { continuation ->
-        addOnSuccessListener { continuation.resume(it) }
-        addOnFailureListener { continuation.resumeWithException(it) }
-    }
 
     companion object {
         const val SETS_COLLECTION = "sets"

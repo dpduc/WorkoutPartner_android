@@ -65,6 +65,9 @@ class AccountRepository(
         accountDao.update(account.copy(currentStreak = status.currentStreak, bankedShields = status.bankedShields))
     }
 
+    /** Whether this device has any Guest Session ([SessionEntity.accountId] null) still waiting to be claimed — what ticket 07's Auth module checks before triggering migration on sign-up. */
+    suspend fun hasUnclaimedGuestData(): Boolean = sessionDao.getUnowned().isNotEmpty()
+
     /**
      * Re-points every unowned (Guest) Session at [accountId], then refreshes
      * that account's Streak from its now-complete history — the Guest
