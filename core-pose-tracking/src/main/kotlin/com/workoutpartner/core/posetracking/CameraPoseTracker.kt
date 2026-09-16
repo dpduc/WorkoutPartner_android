@@ -41,40 +41,64 @@ class CameraPoseTracker(private val context: Context) : PoseTracker {
     private var poseLandmarker: PoseLandmarker? = null
     private val trackingStateMachine = TrackingStateMachine()
     private var emitSignal: ((PoseTrackingSignal) -> Unit)? = null
+    private var emitError: ((String) -> Unit)? = null
 
     override val signals: Flow<PoseTrackingSignal> = callbackFlow {
         emitSignal = { trySend(it) }
         awaitClose { emitSignal = null }
     }
 
+    override val errors: Flow<String> = callbackFlow {
+        emitError = { trySend(it) }
+        awaitClose { emitError = null }
+    }
+
+    /**
+     * Neither the Pose Landmarker's model load nor CameraX's provider/bind
+     * calls are things this class can guarantee will succeed — the model
+     * asset may not be bundled (see [MODEL_ASSET_PATH]'s doc comment) and a
+     * device may have no usable front camera. Both used to throw straight
+     * out of here uncaught, which crashed the app the moment a Session or
+     * Quick Count screen tried to open the camera; now caught and surfaced
+     * through [errors] instead, so the UI can show a message rather than die.
+     */
     override fun start(lifecycleOwner: LifecycleOwner, previewSurfaceProvider: Preview.SurfaceProvider) {
         if (poseLandmarker == null) {
-            poseLandmarker = createPoseLandmarker()
+            poseLandmarker = try {
+                createPoseLandmarker()
+            } catch (e: Exception) {
+                emitError?.invoke(e.message ?: "Couldn't load the pose tracking model.")
+                return
+            }
         }
 
         val providerFuture = ProcessCameraProvider.getInstance(context)
         providerFuture.addListener(
             {
-                val provider = providerFuture.get()
-                cameraProvider = provider
+                try {
+                    val provider = providerFuture.get()
+                    cameraProvider = provider
 
-                val preview = Preview.Builder().build().apply {
-                    setSurfaceProvider(previewSurfaceProvider)
+                    val preview = Preview.Builder().build().apply {
+                        setSurfaceProvider(previewSurfaceProvider)
+                    }
+
+                    val analysis = ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                        .build()
+                        .also { it.setAnalyzer(ContextCompat.getMainExecutor(context), ::analyzeFrame) }
+
+                    provider.unbindAll()
+                    provider.bindToLifecycle(
+                        lifecycleOwner,
+                        CameraSelector.DEFAULT_FRONT_CAMERA,
+                        preview,
+                        analysis,
+                    )
+                } catch (e: Exception) {
+                    emitError?.invoke(e.message ?: "Couldn't start the camera.")
                 }
-
-                val analysis = ImageAnalysis.Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                    .build()
-                    .also { it.setAnalyzer(ContextCompat.getMainExecutor(context), ::analyzeFrame) }
-
-                provider.unbindAll()
-                provider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_FRONT_CAMERA,
-                    preview,
-                    analysis,
-                )
             },
             ContextCompat.getMainExecutor(context),
         )

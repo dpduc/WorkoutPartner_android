@@ -19,7 +19,10 @@ interface PoseTracker {
     /** Emits one [PoseTrackingSignal] per analyzed camera frame once [start] has bound a camera. */
     val signals: Flow<PoseTrackingSignal>
 
-    /** Binds the front camera to [lifecycleOwner] and starts analysis; frames go to [signals]. */
+    /** Emits a message if [start] fails to initialize the pose model or bind the camera (e.g. a missing model asset, or no usable camera on the device). Terminal — no [signals] follow a failed [start]. */
+    val errors: Flow<String>
+
+    /** Binds the front camera to [lifecycleOwner] and starts analysis; frames go to [signals], or a failure goes to [errors] instead. */
     fun start(lifecycleOwner: LifecycleOwner, previewSurfaceProvider: Preview.SurfaceProvider)
 
     /** Unbinds the camera and releases the MediaPipe Pose Landmarker. Safe to call multiple times, including without a prior [start]. */
