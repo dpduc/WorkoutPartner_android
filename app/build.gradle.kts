@@ -69,6 +69,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.core)
     // camera-core itself comes transitively via core-pose-tracking's `api`
     // dependency on it (PoseTracker.start(...)'s own signature needs it) —
     // only camera-view (PreviewView, used directly in SessionScreens.kt) is

@@ -11,20 +11,44 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Green80,
-    secondary = Neutral80,
+    primary = ElectricOrange,
+    onPrimary = PureWhite,
+    primaryContainer = ElectricOrangeDark,
+    onPrimaryContainer = PureWhite,
+    secondary = BrandCyan,
+    onSecondary = DarkNavy,
+    secondaryContainer = BrandCyanDark,
+    onSecondaryContainer = PureWhite,
+    background = DarkNavy,
+    onBackground = PureWhite,
+    surface = DarkNavySurface,
+    onSurface = PureWhite,
+    surfaceVariant = DarkNavyCard,
+    onSurfaceVariant = MutedSlate,
+    outline = DarkNavyBorder,
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Green40,
-    secondary = Neutral40,
+    primary = ElectricOrange,
+    onPrimary = PureWhite,
+    primaryContainer = ElectricOrangeLight,
+    onPrimaryContainer = DarkNavy,
+    secondary = BrandCyanDark,
+    onSecondary = PureWhite,
+    secondaryContainer = BrandCyanLight,
+    onSecondaryContainer = DarkNavy,
+    background = OffWhite,
+    onBackground = DarkNavy,
+    surface = LightSurface,
+    onSurface = DarkNavy,
+    surfaceVariant = LightCard,
+    onSurfaceVariant = MutedSlate,
+    outline = LightBorder,
 )
 
 @Composable
 fun WorkoutPartnerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+ (our minSdk is 26); default
-    // off until there's an actual palette decision to make with it.
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {

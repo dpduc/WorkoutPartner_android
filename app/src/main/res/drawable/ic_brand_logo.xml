@@ -1,0 +1,83 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Top High-Five Sparks -->
+    <path
+        android:pathData="M 50,17 L 47,11"
+        android:strokeColor="#FF6A00"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M 54,15 L 54,8"
+        android:strokeColor="#00D2FF"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M 58,17 L 61,11"
+        android:strokeColor="#00D2FF"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round" />
+
+    <!-- ORANGE ATHLETE (W) -->
+    <!-- Head (Ring) -->
+    <path
+        android:pathData="M 40,32 m -5.5,0 a 5.5,5.5 0 1,1 11,0 a 5.5,5.5 0 1,1 -11,0"
+        android:strokeColor="#FF6A00"
+        android:strokeWidth="2.8"
+        android:fillColor="#00000000" />
+
+    <!-- Outer W Contour & High Five Arm -->
+    <path
+        android:pathData="M 23,45 L 31,80 L 41,54 L 52,24"
+        android:strokeColor="#FF6A00"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+    <!-- Inner W Body & Upward Arrow -->
+    <path
+        android:pathData="M 45,45 C 41,56 36,66 34,75 L 43,80 L 52,58 L 52,48"
+        android:strokeColor="#FF6A00"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+    <!-- Arrowhead on W -->
+    <path
+        android:pathData="M 48.5,51 L 52,44 L 55.5,51"
+        android:strokeColor="#FF6A00"
+        android:strokeWidth="2.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+    <!-- CYAN ATHLETE (P) -->
+    <!-- Head (Ring) -->
+    <path
+        android:pathData="M 68,32 m -5.5,0 a 5.5,5.5 0 1,1 11,0 a 5.5,5.5 0 1,1 -11,0"
+        android:strokeColor="#00D2FF"
+        android:strokeWidth="2.8"
+        android:fillColor="#00000000" />
+
+    <!-- High-Five Arm & P Outer Loop -->
+    <path
+        android:pathData="M 56,24 C 61,35 62,45 62,54 C 67,51 77,51 77,61 C 77,70 68,70 62,70 L 62,80 L 72,80 C 79,80 84,74 84,65 L 84,48"
+        android:strokeColor="#00D2FF"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+    <!-- Arrowhead on P -->
+    <path
+        android:pathData="M 80.5,51 L 84,44 L 87.5,51"
+        android:strokeColor="#00D2FF"
+        android:strokeWidth="2.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+</vector>
