@@ -11,6 +11,7 @@ import com.workoutpartner.data.AuthRepository
 import com.workoutpartner.data.FirebaseAuthGateway
 import com.workoutpartner.data.FirestoreSyncGateway
 import com.workoutpartner.data.GuestAccountMigration
+import com.workoutpartner.data.LocalAuthGateway
 import com.workoutpartner.data.RemoteSyncGateway
 import com.workoutpartner.data.RosterRepository
 import com.workoutpartner.data.SetRepository
@@ -24,24 +25,25 @@ import com.workoutpartner.data.createDatabase
  * ticket's scope. One instance lives for the process lifetime, held by
  * [com.workoutpartner.app.WorkoutPartnerApplication].
  *
- * [authGateway]/[remoteSyncGateway] (and everything built on them) stay
- * `by lazy`: constructing them touches `FirebaseAuth`/`FirebaseFirestore`,
- * which needs Firebase to have been initialized from a real
- * `google-services.json` — still not bundled (ticket 01's original gap,
- * still open here; ticket 07/14 anticipated whoever adds it). Laziness
+ * [remoteSyncGateway] stays `by lazy`: constructing it touches
+ * `FirebaseFirestore`, which needs Firebase to have been initialized from a
+ * real `google-services.json` — still not bundled (ticket 01's original
+ * gap, still open here; ticket 07/14 anticipated whoever adds it). Laziness
  * means the app can launch and use everything Room-backed (Sessions, Sets,
- * Roster, Tallies) without crashing at startup; only actually signing in or
- * syncing touches Firebase, and will fail until that file lands.
+ * Roster, Tallies) without crashing at startup; only actually syncing
+ * touches Firebase, and will fail until that file lands.
  *
- * [authRepository] is nullable for the same reason, one level up: ticket 13
- * first guarded this at its own call site in `MainActivity` with a
- * `runCatching`, but every consumer would have had to remember to re-wrap
- * it the same way — `/code-review` flagged this as the kind of thing that
- * belongs in the one place that already owns "who touches Firebase and
- * when." Caught here instead, `by lazy` permanently memoizes the resulting
- * `null` (the failure never escapes the lazy block, so it's not retried on
- * next access, unlike a bare `by lazy { FirebaseAuthGateway(...) }` would
- * be if it kept throwing).
+ * [authGateway] used to be a plain `by lazy { FirebaseAuthGateway(...) }`
+ * with the resulting `null` construction failure caught one level up, on
+ * [authRepository] — ticket 13 first guarded this at its own call site in
+ * `MainActivity` with a `runCatching`, but every consumer would have had to
+ * remember to re-wrap it the same way, and `/code-review` flagged that as
+ * the kind of thing that belongs in the one place that already owns "who
+ * touches Firebase and when." Ticket 15 (`docs/auth-roadmap.md` Phase 1)
+ * moved the fallback back down to this gateway seam now that there's a
+ * real, non-throwing alternative to fall back to: [LocalAuthGateway]. That
+ * means [authRepository] is never null anymore — Sign Up/Sign In always
+ * render, whether or not Firebase is provisioned on this build.
  */
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
@@ -53,14 +55,15 @@ class AppContainer(context: Context) {
     val tallyRepository = TallyRepository(database)
     val rosterRepository = RosterRepository(database)
 
-    val authGateway: AuthGateway by lazy { FirebaseAuthGateway(FirebaseAuth.getInstance()) }
+    val authGateway: AuthGateway by lazy {
+        runCatching { FirebaseAuthGateway(FirebaseAuth.getInstance()) }.getOrElse { LocalAuthGateway(appContext) }
+    }
     val remoteSyncGateway: RemoteSyncGateway by lazy { FirestoreSyncGateway(FirebaseFirestore.getInstance()) }
 
     val guestAccountMigration = GuestAccountMigration(accountRepository)
 
-    /** Null if constructing the Firebase-backed auth stack failed (no `google-services.json` yet) — see this class's doc comment. Sign-up/sign-in are genuinely unavailable until that's provisioned; callers should treat null as "not available right now," not crash. */
-    val authRepository: AuthRepository? by lazy {
-        runCatching { AuthRepository(authGateway, accountRepository, onGuestDataToMigrate = guestAccountMigration::invoke) }.getOrNull()
+    val authRepository: AuthRepository by lazy {
+        AuthRepository(authGateway, accountRepository, onGuestDataToMigrate = guestAccountMigration::invoke)
     }
 
     val syncEngine: SyncEngine by lazy {
