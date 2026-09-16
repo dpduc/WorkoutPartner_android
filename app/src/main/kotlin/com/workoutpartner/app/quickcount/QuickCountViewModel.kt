@@ -12,15 +12,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 
 /**
  * The impure glue for one Quick Count run (ticket 11): drives
  * [QuickCountEngine] with the real [PoseTracker] camera stream and saves
  * exactly one [com.workoutpartner.data.TallyEntity] once the run finishes
- * (target reached or manually [stop]ped) — never a Form Score, per spec.md
- * story 38. Not unit-tested, the same "impure shell around a tested pure
- * engine" split as `SessionViewModel`/`CameraPoseTracker`.
+ * (target reached or manually [stop]ped) — including its average Form Score
+ * and elapsed duration (`workout-partner-v2` ticket 03; the engine computes
+ * the former, this class the latter, since [QuickCountEngine] stays pure
+ * and doesn't read a clock itself). Not unit-tested, the same "impure shell
+ * around a tested pure engine" split as `SessionViewModel`/`CameraPoseTracker`.
  */
 class QuickCountViewModel(
     private val trackedProfileId: String,
@@ -32,9 +35,14 @@ class QuickCountViewModel(
 ) : ViewModel() {
 
     private val engine = QuickCountEngine(exercise, target)
+    private val startedAt: Instant = Instant.now(clock)
 
     private val _phase = MutableStateFlow(engine.phase)
     val phase: StateFlow<QuickCountPhase> = _phase.asStateFlow()
+
+    /** Set once, alongside the Tally save, when the run finishes — the engine has no clock of its own to compute this (see this class's own doc comment), so it can't live on [QuickCountPhase.Finished] the way [QuickCountPhase.Finished.formScore] does. */
+    private val _durationSeconds = MutableStateFlow<Int?>(null)
+    val durationSeconds: StateFlow<Int?> = _durationSeconds.asStateFlow()
 
     private var tallySaved = false
 
@@ -44,6 +52,11 @@ class QuickCountViewModel(
                 engine.onPoseSignal(signal)
                 _phase.value = engine.phase
                 saveTallyIfJustFinished()
+            }
+        }
+        viewModelScope.launch {
+            poseTracker.errors.collect { message ->
+                _phase.value = QuickCountPhase.CameraUnavailable(message)
             }
         }
     }
@@ -63,6 +76,8 @@ class QuickCountViewModel(
         if (tallySaved) return
         val finished = _phase.value as? QuickCountPhase.Finished ?: return
         tallySaved = true
+        val elapsedSeconds = Duration.between(startedAt, Instant.now(clock)).seconds.toInt().coerceAtLeast(0)
+        _durationSeconds.value = elapsedSeconds
         viewModelScope.launch {
             tallyRepository.recordTally(
                 trackedProfileId = trackedProfileId,
@@ -70,6 +85,8 @@ class QuickCountViewModel(
                 repsAchieved = finished.repCount,
                 target = target,
                 timestamp = Instant.now(clock),
+                formScore = finished.formScore,
+                durationSeconds = elapsedSeconds,
             )
         }
     }

@@ -71,20 +71,25 @@ service cloud.firestore {
     }
 
     // Tallies (ticket 05 schema; ticket 06/14 sync — field list matches
-    // TallyEntity.toFirestoreMap()). Same immutable-fact shape as Sets;
-    // never carries a Form Score (CONTEXT.md's Tally definition).
+    // TallyEntity.toFirestoreMap()). Same immutable-fact shape as Sets.
+    // formScore/durationSeconds (workout-partner-v2 ticket 03, reversing
+    // the earlier "Quick Count Tallies never have a Form Score" decision)
+    // are nullable in the same shape `target` already was, for a Tally
+    // recorded before that ticket landed.
     match /tallies/{tallyId} {
       allow read: if ownsAccount(resource.data.accountId);
       allow create: if ownsAccount(request.resource.data.accountId)
         && request.resource.data.keys().hasOnly(
-             ['id', 'accountId', 'trackedProfileId', 'exercise', 'repsAchieved', 'target', 'timestamp']
+             ['id', 'accountId', 'trackedProfileId', 'exercise', 'repsAchieved', 'target', 'timestamp', 'formScore', 'durationSeconds']
            )
         && request.resource.data.id is string
         && request.resource.data.trackedProfileId is string
         && request.resource.data.exercise is string
         && request.resource.data.repsAchieved is int
         && (request.resource.data.target == null || request.resource.data.target is int)
-        && request.resource.data.timestamp is timestamp;
+        && request.resource.data.timestamp is timestamp
+        && (request.resource.data.formScore == null || request.resource.data.formScore is int)
+        && (request.resource.data.durationSeconds == null || request.resource.data.durationSeconds is int);
       allow update, delete: if false;
     }
 

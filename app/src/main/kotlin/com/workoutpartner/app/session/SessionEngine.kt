@@ -34,6 +34,8 @@ sealed interface SessionPhase {
     data class SetSummary(val stepIndex: Int, val completedSet: CompletedSet) : SessionPhase
     data class Resting(val stepIndex: Int, val secondsRemaining: Int) : SessionPhase
     data class SessionComplete(val completedSets: List<CompletedSet>) : SessionPhase
+    /** [SessionViewModel] pushes this in directly when [com.workoutpartner.core.posetracking.PoseTracker.errors] fires — not something [SessionEngine] itself can reach. */
+    data class CameraUnavailable(val message: String) : SessionPhase
 }
 
 /**

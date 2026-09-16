@@ -10,10 +10,16 @@ import java.time.Instant
 /**
  * A Tally (CONTEXT.md): the record produced by one Quick Count run —
  * belongs to a [TrackedProfileEntity], not to an Account's own
- * Session/Streak history. Never carries a Form Score (CONTEXT.md: "Quick
- * Count Tallies never have a Form Score — they're raw counts"), and
- * [target] is optional (spec.md user story 36: "optionally set a target
- * count for a Quick Count run").
+ * Session/Streak history. [target] is optional (spec.md user story 36:
+ * "optionally set a target count for a Quick Count run").
+ *
+ * [formScore]/[durationSeconds] (`workout-partner-v2` ticket 03) reverse
+ * the earlier "Quick Count Tallies never have a Form Score" decision —
+ * `QuickCountEngine` now records each Rep's form-threshold pass the same
+ * way `SessionEngine` does, and [durationSeconds] is elapsed run time.
+ * Nullable: a Tally recorded before this ticket landed genuinely has
+ * neither value, and a fabricated `0` would misrepresent that as a real
+ * (and suspiciously perfect/instant) result.
  *
  * Cascade-deletes with its Tracked Profile: a Tally has no existence apart
  * from the profile it was recorded against.
@@ -37,4 +43,6 @@ data class TallyEntity(
     val repsAchieved: Int,
     val target: Int?,
     val timestamp: Instant,
+    val formScore: Int? = null,
+    val durationSeconds: Int? = null,
 )

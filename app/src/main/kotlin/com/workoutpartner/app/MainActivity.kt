@@ -9,12 +9,22 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -38,6 +48,7 @@ import com.workoutpartner.app.di.AppContainer
 import com.workoutpartner.app.onboarding.DisclaimerScreen
 import com.workoutpartner.app.onboarding.GuestConversionDialog
 import com.workoutpartner.app.onboarding.OnboardingPrefs
+import com.workoutpartner.app.onboarding.ProfileSetupScreen
 import com.workoutpartner.app.onboarding.SignInScreen
 import com.workoutpartner.app.onboarding.SignUpScreen
 import com.workoutpartner.app.onboarding.WelcomeScreen
@@ -46,12 +57,17 @@ import com.workoutpartner.app.quickcount.QuickCountRunScreen
 import com.workoutpartner.app.quickcount.QuickCountSetupScreen
 import com.workoutpartner.app.quickcount.RosterScreen
 import com.workoutpartner.app.quickcount.TallyHistoryScreen
+import com.workoutpartner.app.routines.BodyStats
+import com.workoutpartner.app.routines.RoutineDifficulty
+import com.workoutpartner.app.routines.toBodyStats
 import com.workoutpartner.app.session.RoutinePickerScreen
 import com.workoutpartner.app.session.SessionScreen
+import com.workoutpartner.app.settings.SettingsScreen
+import com.workoutpartner.app.ui.components.LogoOrientation
+import com.workoutpartner.app.ui.components.WorkoutPartnerBrandLogo
 import com.workoutpartner.app.ui.theme.WorkoutPartnerTheme
 import com.workoutpartner.data.AuthState
 import com.workoutpartner.data.RoutineWithSteps
-import kotlinx.coroutines.flow.flowOf
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,21 +105,35 @@ fun WorkoutPartnerApp(container: AppContainer) {
             when {
                 !prefs.hasSeenDisclaimer -> AppScreen.Disclaimer
                 !prefs.hasChosenHowToStart -> AppScreen.Welcome
-                else -> AppScreen.RoutinePicker
+                !prefs.hasCompletedProfile -> AppScreen.ProfileSetup
+                else -> AppScreen.MainMenu
             },
         )
     }
     var routines by remember { mutableStateOf<List<RoutineWithSteps>>(emptyList()) }
     var showGuestConversionPrompt by remember { mutableStateOf(false) }
 
-    // container.authRepository is null if Firebase isn't configured yet
-    // (still no google-services.json — ticket 01/07's disclosed gap; see
-    // AppContainer's doc comment for why that's handled there, not here).
-    // Falls back to Guest behavior instead of crashing; Sign up/Sign in
-    // stay genuinely unavailable until that file lands.
+    // container.authRepository is always available (ticket 15): it falls
+    // back to a local, offline LocalAuthGateway when Firebase isn't
+    // configured (see AppContainer's doc comment), so Sign up/Sign in
+    // always render regardless of whether google-services.json exists.
     val authRepository = container.authRepository
-    val authState by (authRepository?.authState ?: flowOf(AuthState.Guest)).collectAsState(initial = AuthState.Guest)
+    val authState by authRepository.authState.collectAsState(initial = AuthState.Guest)
     val accountId = (authState as? AuthState.SignedIn)?.accountId
+
+    // The Account's (or, while a Guest, the GuestProfileEntity's) body
+    // stats — feeds RoutineDifficulty (workout-partner-v2 ticket 02).
+    // Re-fetched whenever accountId changes (Guest -> Account on sign-up/
+    // in) so a stale pre-signup Guest reading never lingers after that.
+    var bodyStats by remember { mutableStateOf<BodyStats?>(null) }
+    LaunchedEffect(accountId) {
+        bodyStats = if (accountId != null) {
+            container.accountRepository.getAccount(accountId)?.toBodyStats()
+        } else {
+            container.accountRepository.getGuestProfile()?.toBodyStats()
+        }
+    }
+    val difficultyTier = RoutineDifficulty.compute(bodyStats)
 
     LaunchedEffect(Unit) {
         BundledRoutines.seedIfEmpty(container.database.routineDao())
@@ -116,58 +146,91 @@ fun WorkoutPartnerApp(container: AppContainer) {
         AppScreen.Disclaimer -> DisclaimerScreen(
             onAcknowledge = {
                 prefs.hasSeenDisclaimer = true
-                screen = if (prefs.hasChosenHowToStart) AppScreen.RoutinePicker else AppScreen.Welcome
+                screen = when {
+                    !prefs.hasChosenHowToStart -> AppScreen.Welcome
+                    !prefs.hasCompletedProfile -> AppScreen.ProfileSetup
+                    else -> AppScreen.MainMenu
+                }
             },
         )
         AppScreen.Welcome -> WelcomeScreen(
-            onContinueAsGuest = { prefs.hasChosenHowToStart = true; screen = AppScreen.RoutinePicker },
+            onContinueAsGuest = { prefs.hasChosenHowToStart = true; screen = AppScreen.ProfileSetup },
             onSignUp = { screen = AppScreen.SignUp },
             onSignIn = { screen = AppScreen.SignIn },
         )
-        AppScreen.SignUp -> {
-            val repo = authRepository
-            if (repo == null) {
-                AuthUnavailableScreen(onBack = { screen = AppScreen.Welcome })
-            } else {
-                SignUpScreen(
-                    authRepository = repo,
-                    onSignedUp = { prefs.hasChosenHowToStart = true; screen = AppScreen.RoutinePicker },
-                    onCancel = { screen = AppScreen.Welcome },
+        AppScreen.SignUp -> SignUpScreen(
+            authRepository = authRepository,
+            onSignedUp = {
+                prefs.hasChosenHowToStart = true
+                // A Guest who already answered ProfileSetup and is only now
+                // converting (GuestConversionDialog) had that answer already
+                // claimed onto the new Account by signUp's own migration
+                // (AccountRepository.claimGuestData) — no need to ask again.
+                screen = if (prefs.hasCompletedProfile) AppScreen.MainMenu else AppScreen.ProfileSetup
+            },
+            onCancel = { screen = AppScreen.Welcome },
+        )
+        AppScreen.SignIn -> SignInScreen(
+            authRepository = authRepository,
+            onSignedIn = {
+                prefs.hasChosenHowToStart = true
+                // An existing Account already has a profile from its own
+                // prior sign-up — nothing to collect on this device.
+                prefs.hasCompletedProfile = true
+                screen = AppScreen.MainMenu
+            },
+            onCancel = { screen = AppScreen.Welcome },
+        )
+        AppScreen.ProfileSetup -> ProfileSetupScreen(
+            onSubmit = { name, age, heightCm, weightKg, activityLevel ->
+                val currentAccountId = accountId
+                if (currentAccountId != null) {
+                    container.accountRepository.updateProfile(currentAccountId, name, age, heightCm, weightKg, activityLevel)
+                } else {
+                    container.accountRepository.saveGuestProfile(name, age, heightCm, weightKg, activityLevel)
+                }
+                // The accountId-keyed LaunchedEffect above won't re-fire for
+                // a Guest (accountId stays null) — update directly so
+                // RoutineDifficulty sees this answer immediately.
+                bodyStats = BodyStats(age, heightCm, weightKg)
+            },
+            onDone = { prefs.hasCompletedProfile = true; screen = AppScreen.MainMenu },
+        )
+        AppScreen.MainMenu -> Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { WorkoutPartnerBrandLogo(orientation = LogoOrientation.HORIZONTAL, size = 36.dp) },
+                    actions = {
+                        OverflowMenu(
+                            isAccountHolder = accountId != null,
+                            onProgress = { screen = AppScreen.Progress },
+                            onSettings = { screen = AppScreen.Settings },
+                        )
+                    },
                 )
-            }
-        }
-        AppScreen.SignIn -> {
-            val repo = authRepository
-            if (repo == null) {
-                AuthUnavailableScreen(onBack = { screen = AppScreen.Welcome })
-            } else {
-                SignInScreen(
-                    authRepository = repo,
-                    onSignedIn = { prefs.hasChosenHowToStart = true; screen = AppScreen.RoutinePicker },
-                    onCancel = { screen = AppScreen.Welcome },
-                )
-            }
+            },
+        ) { padding ->
+            MainMenuScreen(
+                onWorkouts = { screen = AppScreen.RoutinePicker },
+                // Quick Count is Account-holder-only (CONTEXT.md: Roster/
+                // Tracked Profile), same gating the old overflow menu's
+                // Roster-or-Sign-up branch had — just relocated to this
+                // tile now that Quick Count is a top-level section.
+                onQuickCount = { screen = if (accountId != null) AppScreen.Roster else AppScreen.SignUp },
+                modifier = Modifier.padding(padding),
+            )
         }
         AppScreen.RoutinePicker -> Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Workout Partner") },
-                    actions = {
-                        TextButton(onClick = { screen = AppScreen.Progress }) { Text("Progress") }
-                        // Roster/Quick Count is Account-holder only (spec.md
-                        // stories 34-41) — hidden for a Guest, same
-                        // accountId == null gating as Progress.
-                        if (accountId != null) {
-                            TextButton(onClick = { screen = AppScreen.Roster }) { Text("Roster") }
-                        } else {
-                            TextButton(onClick = { screen = AppScreen.SignUp }) { Text("Sign up") }
-                        }
-                    },
+                    title = { Text("Workouts") },
+                    navigationIcon = { TextButton(onClick = { screen = AppScreen.MainMenu }) { Text("Back") } },
                 )
             },
         ) { padding ->
             RoutinePickerScreen(
                 routines = routines,
+                difficultyTier = difficultyTier,
                 onRoutineSelected = { screen = AppScreen.Session(it) },
                 modifier = Modifier.padding(padding),
             )
@@ -188,6 +251,7 @@ fun WorkoutPartnerApp(container: AppContainer) {
                     setRepository = container.setRepository,
                     accountRepository = container.accountRepository,
                     poseTrackerFactory = container::createPoseTracker,
+                    difficultyTier = difficultyTier,
                     onSetFinished = {
                         // The post-Set prompt to create an Account while
                         // still a Guest (ticket 13, spec.md story 3) — this
@@ -202,11 +266,29 @@ fun WorkoutPartnerApp(container: AppContainer) {
                 )
             }
         }
+        AppScreen.Settings -> Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Settings") },
+                    navigationIcon = { TextButton(onClick = { screen = AppScreen.MainMenu }) { Text("Back") } },
+                )
+            },
+        ) { padding ->
+            SettingsScreen(
+                accountId = accountId,
+                accountRepository = container.accountRepository,
+                authRepository = authRepository,
+                onSignedOut = { screen = AppScreen.MainMenu },
+                onSignUp = { screen = AppScreen.SignUp },
+                onViewProgress = { screen = AppScreen.Progress },
+                modifier = Modifier.padding(padding),
+            )
+        }
         AppScreen.Progress -> Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text("Progress") },
-                    navigationIcon = { TextButton(onClick = { screen = AppScreen.RoutinePicker }) { Text("Back") } },
+                    navigationIcon = { TextButton(onClick = { screen = AppScreen.MainMenu }) { Text("Back") } },
                 )
             },
         ) { padding ->
@@ -219,13 +301,13 @@ fun WorkoutPartnerApp(container: AppContainer) {
         }
         AppScreen.Roster -> {
             if (accountId == null) {
-                screen = AppScreen.RoutinePicker
+                screen = AppScreen.MainMenu
             } else {
                 Scaffold(
                     topBar = {
                         TopAppBar(
                             title = { Text("Roster") },
-                            navigationIcon = { TextButton(onClick = { screen = AppScreen.RoutinePicker }) { Text("Back") } },
+                            navigationIcon = { TextButton(onClick = { screen = AppScreen.MainMenu }) { Text("Back") } },
                         )
                     },
                 ) { padding ->
@@ -277,13 +359,59 @@ fun WorkoutPartnerApp(container: AppContainer) {
     }
 }
 
+/**
+ * [AppScreen.MainMenu]'s own overflow menu: Progress and Settings. Roster/
+ * Sign-up used to live here too (`isAccountHolder` branching between them)
+ * before `workout-partner-v2` ticket 02 promoted Quick Count to its own
+ * top-level tile on [MainMenuScreen] — kept as a plain top-bar overflow
+ * rather than adding a third tile, since Progress/Settings aren't
+ * first-class sections the way Workouts/Quick Count are.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AuthUnavailableScreen(onBack: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Sign-up/sign-in isn't available on this build yet.", style = MaterialTheme.typography.bodyLarge)
-                TextButton(onClick = onBack, modifier = Modifier.padding(top = 16.dp)) { Text("Back") }
+private fun OverflowMenu(isAccountHolder: Boolean, onProgress: () -> Unit, onSettings: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    IconButton(onClick = { expanded = true }) {
+        Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+    }
+    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenuItem(text = { Text("Progress") }, onClick = { expanded = false; onProgress() })
+        DropdownMenuItem(text = { Text("Settings") }, onClick = { expanded = false; onSettings() })
+    }
+}
+
+/**
+ * The app's home screen (`workout-partner-v2` ticket 02): two top-level
+ * sections — Workouts (pre-built Routines, tuned/tagged per
+ * [com.workoutpartner.app.routines.RoutineDifficulty]) and Quick Count.
+ * [onQuickCount] itself decides Roster-vs-Sign-up (Guest); this composable
+ * doesn't need to know which.
+ */
+@Composable
+private fun MainMenuScreen(onWorkouts: () -> Unit, onQuickCount: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onWorkouts)) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("Workouts", style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        "HIIT, Tabata, and AMRAP-tagged Routines, tuned to you.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+            Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onQuickCount)) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("Quick Count", style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        "Count reps for one Exercise — reps, time, and average form score.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
             }
         }
     }

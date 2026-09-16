@@ -28,14 +28,27 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.workoutpartner.app.routines.DifficultyTier
 import com.workoutpartner.data.AccountRepository
 import com.workoutpartner.data.RoutineWithSteps
 import com.workoutpartner.data.SetRepository
 import com.workoutpartner.core.posetracking.PoseTracker
 
-/** Routine picker (ticket 09): the entry point into a Session — bundled Routines only, per spec.md's Out of Scope (no custom Routine authoring). */
+/**
+ * Routine picker (ticket 09): the entry point into a Session — bundled
+ * Routines only, per spec.md's Out of Scope (no custom Routine authoring).
+ * Each card shows its Routine's format tag and the account's computed
+ * [difficultyTier] (`workout-partner-v2` ticket 02) as badges — purely
+ * informational here; the actual rep/rest scaling happens when
+ * [SessionViewModel] builds its engine steps.
+ */
 @Composable
-fun RoutinePickerScreen(routines: List<RoutineWithSteps>, onRoutineSelected: (RoutineWithSteps) -> Unit, modifier: Modifier = Modifier) {
+fun RoutinePickerScreen(
+    routines: List<RoutineWithSteps>,
+    difficultyTier: DifficultyTier,
+    onRoutineSelected: (RoutineWithSteps) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Surface(modifier = modifier.fillMaxSize()) {
         LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(routines, key = { it.routine.id }) { routine ->
@@ -43,8 +56,14 @@ fun RoutinePickerScreen(routines: List<RoutineWithSteps>, onRoutineSelected: (Ro
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = routine.routine.name, style = MaterialTheme.typography.titleMedium)
                         Text(
+                            text = "${routine.routine.format.name} • ${difficultyTier.name.lowercase().replaceFirstChar(Char::uppercase)}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
                             text = routine.steps.joinToString(" • ") { "${it.exercise.name.lowercase().replace('_', ' ')} x${it.targetReps}" },
                             style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(top = 4.dp),
                         )
                         Button(onClick = { onRoutineSelected(routine) }, modifier = Modifier.padding(top = 12.dp)) {
                             Text("Start")
@@ -73,6 +92,7 @@ fun SessionScreen(
     setRepository: SetRepository,
     accountRepository: AccountRepository,
     poseTrackerFactory: () -> PoseTracker,
+    difficultyTier: DifficultyTier = DifficultyTier.STANDARD,
     onSetFinished: () -> Unit = {},
     onSessionComplete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -80,7 +100,9 @@ fun SessionScreen(
     val viewModel: SessionViewModel = viewModel(
         factory = remember {
             viewModelFactory {
-                initializer { SessionViewModel(routine, accountId, setRepository, accountRepository, poseTrackerFactory()) }
+                initializer {
+                    SessionViewModel(routine, accountId, setRepository, accountRepository, poseTrackerFactory(), difficultyTier)
+                }
             }
         },
     )
@@ -100,6 +122,7 @@ fun SessionScreen(
             )
             is SessionPhase.Resting -> RestingContent(current, onSkip = viewModel::skipRest)
             is SessionPhase.SessionComplete -> SessionSummaryContent(current, account?.currentStreak, account?.weeklyTarget, onDone = onSessionComplete)
+            is SessionPhase.CameraUnavailable -> CameraUnavailableContent(current, onDone = onSessionComplete)
         }
     }
 }
@@ -161,6 +184,17 @@ private fun SetSummaryContent(phase: SessionPhase.SetSummary, onContinue: () -> 
             Text("Form Score: ${set.formScore}")
             Text(text = set.formNote, style = MaterialTheme.typography.bodyMedium)
             Button(onClick = onContinue, modifier = Modifier.padding(top = 16.dp)) { Text("Continue") }
+        }
+    }
+}
+
+@Composable
+private fun CameraUnavailableContent(phase: SessionPhase.CameraUnavailable, onDone: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Camera unavailable", style = MaterialTheme.typography.titleLarge)
+            Text(text = phase.message, modifier = Modifier.padding(top = 8.dp))
+            Button(onClick = onDone, modifier = Modifier.padding(top = 16.dp)) { Text("Back") }
         }
     }
 }

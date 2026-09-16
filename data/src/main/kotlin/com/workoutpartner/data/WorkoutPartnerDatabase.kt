@@ -6,9 +6,11 @@ import androidx.room.TypeConverters
 
 /**
  * The Room schema for spec.md's conceptual data model (ticket 05) plus the
- * offline-sync outbox (ticket 06's [PendingSyncEntity]). [createDatabase]
- * builds a real, on-disk instance; the repository classes (ticket 06) are
- * everything that reads or writes through it.
+ * offline-sync outbox (ticket 06's [PendingSyncEntity]) and
+ * `workout-partner-v2`'s profile/[GuestProfileEntity] additions (ticket 01,
+ * version 3) and [RoutineEntity.format] (ticket 02, version 4).
+ * [createDatabase] builds a real, on-disk instance; the repository classes
+ * (ticket 06) are everything that reads or writes through it.
  */
 @Database(
     entities = [
@@ -20,8 +22,9 @@ import androidx.room.TypeConverters
         TrackedProfileEntity::class,
         TallyEntity::class,
         PendingSyncEntity::class,
+        GuestProfileEntity::class,
     ],
-    version = 2,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -33,4 +36,5 @@ abstract class WorkoutPartnerDatabase : RoomDatabase() {
     abstract fun trackedProfileDao(): TrackedProfileDao
     abstract fun tallyDao(): TallyDao
     abstract fun pendingSyncDao(): PendingSyncDao
+    abstract fun guestProfileDao(): GuestProfileDao
 }

@@ -9,8 +9,9 @@ import java.time.Instant
  * [Instant] timestamps (stored as epoch millis), core-rep-counting's
  * [Exercise] enum (stored by name, reused directly rather than duplicated
  * into a parallel `data`-module enum — the same shared-vocabulary pattern
- * ticket 03 used for Landmark/PoseLandmarkFrame), and this module's own
- * [SyncEntityKind] (ticket 06), also stored by name.
+ * ticket 03 used for Landmark/PoseLandmarkFrame), this module's own
+ * [SyncEntityKind] (ticket 06), also stored by name, and [ActivityLevel]
+ * (`workout-partner-v2` ticket 01), likewise stored by name.
  */
 object Converters {
     @TypeConverter
@@ -30,4 +31,16 @@ object Converters {
 
     @TypeConverter
     fun nameToSyncEntityKind(name: String?): SyncEntityKind? = name?.let(SyncEntityKind::valueOf)
+
+    @TypeConverter
+    fun activityLevelToName(level: ActivityLevel?): String? = level?.name
+
+    @TypeConverter
+    fun nameToActivityLevel(name: String?): ActivityLevel? = name?.let(ActivityLevel::valueOf)
+
+    @TypeConverter
+    fun routineFormatToName(format: RoutineFormat?): String? = format?.name
+
+    @TypeConverter
+    fun nameToRoutineFormat(name: String?): RoutineFormat? = name?.let(RoutineFormat::valueOf)
 }

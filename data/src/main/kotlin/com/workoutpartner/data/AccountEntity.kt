@@ -33,6 +33,14 @@ import com.workoutpartner.core.streaks.StreakCalculator
  * preference" — ticket 12 (daily reminder notification) may need to extend
  * this (e.g. a preferred time) once it's built; not speculated on further
  * here.
+ *
+ * [name]/[age]/[heightCm]/[weightKg]/[activityLevel] (`workout-partner-v2`
+ * ticket 01) are the Account's own body-stats, collected at onboarding and
+ * consumed by `app`'s routine-difficulty tuning (ticket 02). Nullable, not
+ * defaulted: an Account row created before this ticket landed (or a Guest's
+ * [GuestProfileEntity] row that was never claimed) genuinely hasn't
+ * answered these yet, and a fabricated default would misrepresent that as a
+ * real answer.
  */
 @Entity(tableName = "accounts")
 data class AccountEntity(
@@ -42,4 +50,9 @@ data class AccountEntity(
     val bankedShields: Int = 0,
     val currentStreak: Int = 0,
     val notificationsEnabled: Boolean = true,
+    val name: String? = null,
+    val age: Int? = null,
+    val heightCm: Int? = null,
+    val weightKg: Double? = null,
+    val activityLevel: ActivityLevel? = null,
 )

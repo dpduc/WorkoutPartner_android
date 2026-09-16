@@ -26,6 +26,7 @@ class AccountRepository(
     private val accountDao: AccountDao = database.accountDao(),
     private val sessionDao: SessionDao = database.sessionDao(),
     private val setDao: SetDao = database.setDao(),
+    private val guestProfileDao: GuestProfileDao = database.guestProfileDao(),
 ) {
     suspend fun getAccount(accountId: String): AccountEntity? = accountDao.getById(accountId)
 
@@ -48,6 +49,36 @@ class AccountRepository(
         accountDao.update(account.copy(notificationsEnabled = enabled))
     }
 
+    /** Updates the Account's own body-stats (`workout-partner-v2` ticket 01) — collected once at onboarding, editable afterward from Settings. */
+    suspend fun updateProfile(
+        accountId: String,
+        name: String,
+        age: Int,
+        heightCm: Int,
+        weightKg: Double,
+        activityLevel: ActivityLevel,
+    ) {
+        val account = accountDao.getById(accountId) ?: return
+        accountDao.update(
+            account.copy(name = name, age = age, heightCm = heightCm, weightKg = weightKg, activityLevel = activityLevel),
+        )
+    }
+
+    /** A Guest's in-progress body-stats answers, captured before an Account exists — see [GuestProfileEntity]. */
+    suspend fun saveGuestProfile(
+        name: String,
+        age: Int,
+        heightCm: Int,
+        weightKg: Double,
+        activityLevel: ActivityLevel,
+    ) {
+        guestProfileDao.upsert(
+            GuestProfileEntity(name = name, age = age, heightCm = heightCm, weightKg = weightKg, activityLevel = activityLevel),
+        )
+    }
+
+    suspend fun getGuestProfile(): GuestProfileEntity? = guestProfileDao.get()
+
     /**
      * Recomputes [AccountEntity.currentStreak]/[AccountEntity.bankedShields]
      * from the account's full Set history via `core-streaks.StreakCalculator`
@@ -69,12 +100,14 @@ class AccountRepository(
     suspend fun hasUnclaimedGuestData(): Boolean = sessionDao.getUnowned().isNotEmpty()
 
     /**
-     * Re-points every unowned (Guest) Session at [accountId], then refreshes
-     * that account's Streak from its now-complete history — the Guest
-     * period counts in full, since it's the same Session/Set rows, just
-     * newly owned (see [AccountEntity]'s doc comment). Both steps run in one
-     * transaction: a crash between them should never leave a re-owned
-     * account with stale Streak columns.
+     * Re-points every unowned (Guest) Session at [accountId], refreshes that
+     * account's Streak from its now-complete history, and — if a
+     * [GuestProfileEntity] row exists (`workout-partner-v2` ticket 01) —
+     * copies its body-stats onto the new Account and clears the guest row.
+     * The Guest period counts in full, since it's the same Session/Set
+     * rows, just newly owned (see [AccountEntity]'s doc comment). All steps
+     * run in one transaction: a crash partway through should never leave a
+     * re-owned account with stale Streak columns or a half-claimed profile.
      *
      * This is the primitive, not the migration itself — ticket 08 also
      * needs to touch Firestore/Auth, which is beyond this repository.
@@ -83,6 +116,20 @@ class AccountRepository(
         database.withTransaction {
             sessionDao.claimUnowned(accountId)
             recomputeStreak(accountId, today, zone)
+            guestProfileDao.get()?.let { guestProfile ->
+                accountDao.getById(accountId)?.let { account ->
+                    accountDao.update(
+                        account.copy(
+                            name = guestProfile.name,
+                            age = guestProfile.age,
+                            heightCm = guestProfile.heightCm,
+                            weightKg = guestProfile.weightKg,
+                            activityLevel = guestProfile.activityLevel,
+                        ),
+                    )
+                }
+                guestProfileDao.clear()
+            }
         }
     }
 }

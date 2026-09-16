@@ -47,6 +47,20 @@ fun TallyHistoryScreen(profile: TrackedProfileEntity, tallyRepository: TallyRepo
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(tally.exercise.name.lowercase().replace('_', ' '), style = MaterialTheme.typography.bodyLarge)
                             Text(if (tally.target != null) "${tally.repsAchieved} / ${tally.target} reps" else "${tally.repsAchieved} reps")
+                            // formScore/durationSeconds (workout-partner-v2
+                            // ticket 03) are null for a Tally recorded
+                            // before that ticket landed — omit the line
+                            // rather than show a fabricated "0".
+                            if (tally.durationSeconds != null || tally.formScore != null) {
+                                Text(
+                                    buildString {
+                                        tally.durationSeconds?.let { append("${it / 60}:${(it % 60).toString().padStart(2, '0')}") }
+                                        if (tally.durationSeconds != null && tally.formScore != null) append(" • ")
+                                        tally.formScore?.let { append("Form Score $it") }
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
                         }
                     }
                 }

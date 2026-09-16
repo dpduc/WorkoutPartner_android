@@ -86,6 +86,7 @@ fun QuickCountRunScreen(
         },
     )
     val phase by viewModel.phase.collectAsState()
+    val durationSeconds by viewModel.durationSeconds.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     Surface(modifier = modifier.fillMaxSize()) {
@@ -116,7 +117,23 @@ fun QuickCountRunScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Tally saved", style = MaterialTheme.typography.titleLarge)
                     Text("${current.repCount} reps")
+                    Text("Form Score: ${current.formScore}")
+                    // durationSeconds arrives one publish after `current`
+                    // itself (QuickCountViewModel computes it alongside the
+                    // save, not inside the pure engine — see its own doc
+                    // comment) — briefly null on the very first Finished
+                    // frame, so this line just doesn't render that frame.
+                    durationSeconds?.let { seconds ->
+                        Text("Time: ${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}")
+                    }
                     Button(onClick = onDone, modifier = Modifier.padding(top = 16.dp)) { Text("Done") }
+                }
+            }
+            is QuickCountPhase.CameraUnavailable -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Camera unavailable", style = MaterialTheme.typography.titleLarge)
+                    Text(text = current.message, modifier = Modifier.padding(top = 8.dp))
+                    Button(onClick = onDone, modifier = Modifier.padding(top = 16.dp)) { Text("Back") }
                 }
             }
         }

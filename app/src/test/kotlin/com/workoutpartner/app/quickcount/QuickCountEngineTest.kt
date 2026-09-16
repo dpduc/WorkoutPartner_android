@@ -45,7 +45,7 @@ class QuickCountEngineTest {
         assertTrue(engine.phase is QuickCountPhase.Running)
         completeOneRep(engine)
 
-        assertEquals(QuickCountPhase.Finished(repCount = 2), engine.phase)
+        assertEquals(QuickCountPhase.Finished(repCount = 2, formScore = 100), engine.phase)
     }
 
     @Test
@@ -64,7 +64,7 @@ class QuickCountEngineTest {
 
         engine.stop()
 
-        assertEquals(QuickCountPhase.Finished(repCount = 1), engine.phase)
+        assertEquals(QuickCountPhase.Finished(repCount = 1, formScore = 100), engine.phase)
     }
 
     @Test
@@ -82,15 +82,35 @@ class QuickCountEngineTest {
     }
 
     @Test
+    fun `formScore is zero before any Rep completes`() {
+        val engine = QuickCountEngine(Exercise.SQUAT, target = null)
+
+        assertEquals(0, engine.formScore)
+    }
+
+    @Test
+    fun `formScore averages passedFormThreshold across completed Reps even though repCount never gates on it`() {
+        val engine = QuickCountEngine(Exercise.SQUAT, target = null)
+
+        completeOneRep(engine) // deep squat (80 degrees) — passes the form threshold
+        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
+        engine.onPoseSignal(PoseTrackingSignal.Trackable(squatFrameAtAngle(120f))) // shallow — counts as a Rep, fails form
+        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
+
+        assertEquals(QuickCountPhase.Running(repCount = 2, trackable = true), engine.phase)
+        assertEquals(50, engine.formScore)
+    }
+
+    @Test
     fun `signals after Finished are no-ops`() {
         val engine = QuickCountEngine(Exercise.SQUAT, target = 1)
         completeOneRep(engine)
-        assertEquals(QuickCountPhase.Finished(repCount = 1), engine.phase)
+        assertEquals(QuickCountPhase.Finished(repCount = 1, formScore = 100), engine.phase)
 
         completeOneRep(engine)
         engine.stop()
 
-        assertEquals(QuickCountPhase.Finished(repCount = 1), engine.phase)
+        assertEquals(QuickCountPhase.Finished(repCount = 1, formScore = 100), engine.phase)
     }
 
     private fun completeOneRep(engine: QuickCountEngine) {

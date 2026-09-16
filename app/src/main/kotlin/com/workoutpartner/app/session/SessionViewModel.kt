@@ -6,6 +6,8 @@ import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.workoutpartner.app.routines.DifficultyTier
+import com.workoutpartner.app.routines.RoutineDifficulty
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.data.AccountEntity
 import com.workoutpartner.data.AccountRepository
@@ -41,10 +43,20 @@ class SessionViewModel(
     private val setRepository: SetRepository,
     private val accountRepository: AccountRepository,
     private val poseTracker: PoseTracker,
+    /** Computed from the Account's (or Guest's) body stats by the caller — see [RoutineDifficulty]. Defaults to [DifficultyTier.STANDARD] (unscaled) when the caller has no profile data yet. */
+    private val difficultyTier: DifficultyTier = DifficultyTier.STANDARD,
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
 
-    private val engine = SessionEngine(routine.steps.map { RoutineStep(it.exercise, it.targetReps, it.restIntervalSeconds) })
+    private val engine = SessionEngine(
+        routine.steps.map {
+            RoutineStep(
+                exercise = it.exercise,
+                targetReps = RoutineDifficulty.adjustedTargetReps(it.targetReps, difficultyTier),
+                restIntervalSeconds = RoutineDifficulty.adjustedRestIntervalSeconds(it.restIntervalSeconds, difficultyTier),
+            )
+        },
+    )
 
     private val _phase = MutableStateFlow(engine.phase)
     val phase: StateFlow<SessionPhase> = _phase.asStateFlow()
@@ -58,6 +70,9 @@ class SessionViewModel(
     private var beepTrackedStepIndex = -1
     private val toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, TONE_VOLUME_PERCENT)
 
+    /** Set once [poseTracker]'s camera/model init fails — stops [publishPhase] from stomping the [SessionPhase.CameraUnavailable] phase back to whatever [SessionEngine] still thinks the phase is on the next tick. */
+    private var cameraUnavailable = false
+
     init {
         viewModelScope.launch {
             sessionId = setRepository.startSession(accountId, routine.routine.id, Instant.now(clock)).id
@@ -67,6 +82,12 @@ class SessionViewModel(
                 engine.onPoseSignal(signal)
                 publishPhase()
                 beepIfNewRep()
+            }
+        }
+        viewModelScope.launch {
+            poseTracker.errors.collect { message ->
+                cameraUnavailable = true
+                _phase.value = SessionPhase.CameraUnavailable(message)
             }
         }
         viewModelScope.launch {
@@ -120,6 +141,7 @@ class SessionViewModel(
     }
 
     private fun publishPhase() {
+        if (cameraUnavailable) return
         _phase.value = engine.phase
     }
 

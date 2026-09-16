@@ -13,6 +13,13 @@ import java.time.Instant
  * Quick Count activity deliberately doesn't count toward the Account's own
  * Streak/Active Days (spec.md user story 41; CONTEXT.md's Tally
  * definition).
+ *
+ * [formScore]/[durationSeconds] (`workout-partner-v2` ticket 03) default to
+ * `null` rather than being required: every *current* caller
+ * ([com.workoutpartner.app.quickcount.QuickCountViewModel]) always supplies
+ * real values now, but this repository itself doesn't need to assume that
+ * forever — `null` is the honest answer for a Tally this repository can't
+ * actually compute those for.
  */
 class TallyRepository(
     private val database: WorkoutPartnerDatabase,
@@ -27,6 +34,8 @@ class TallyRepository(
         repsAchieved: Int,
         target: Int?,
         timestamp: Instant,
+        formScore: Int? = null,
+        durationSeconds: Int? = null,
     ): TallyEntity {
         val tally = TallyEntity(
             id = idGenerator(),
@@ -35,6 +44,8 @@ class TallyRepository(
             repsAchieved = repsAchieved,
             target = target,
             timestamp = timestamp,
+            formScore = formScore,
+            durationSeconds = durationSeconds,
         )
 
         database.withTransaction {

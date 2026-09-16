@@ -35,4 +35,9 @@ fun TallyEntity.toFirestoreMap(accountId: String): Map<String, Any?> = mapOf(
     "repsAchieved" to repsAchieved,
     "target" to target,
     "timestamp" to Timestamp(timestamp.epochSecond, timestamp.nano),
+    // formScore/durationSeconds (workout-partner-v2 ticket 03) — null for a
+    // Tally recorded before that ticket landed, same nullable shape as
+    // `target` above.
+    "formScore" to formScore,
+    "durationSeconds" to durationSeconds,
 )

@@ -13,9 +13,14 @@ import androidx.room.PrimaryKey
  * [SessionEntity]/[SetEntity]/[TrackedProfileEntity]/[TallyEntity] — have no
  * per-Account copy to sync through Firestore (ADR-0001's "mirrors the
  * above" concerns Account-owned data; bundled content ships with the app).
+ *
+ * [format] (`workout-partner-v2` ticket 02) is a display tag only — see
+ * [RoutineFormat]'s doc comment for why this doesn't change how a Session
+ * actually runs.
  */
 @Entity(tableName = "routines")
 data class RoutineEntity(
     @PrimaryKey val id: String,
     val name: String,
+    val format: RoutineFormat = RoutineFormat.STANDARD,
 )

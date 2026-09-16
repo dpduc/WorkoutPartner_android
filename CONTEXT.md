@@ -7,7 +7,7 @@ An Android app that uses on-device pose tracking to count exercise reps and judg
 ### People & accounts
 
 **Account**:
-A registered identity (email/password or provider sign-in) that owns Routines history, Streak state, and a Roster. Created directly at sign-up, or by migrating a Guest.
+A registered identity (email/password or provider sign-in) that owns Routines history, Streak state, and a Roster. Created directly at sign-up, or by migrating a Guest. Also carries the body-stats it answered once during onboarding — name, age, height, weight, and Activity Level — used to tune Routine difficulty; a Guest answers the same questions before an Account exists, and that answer is carried over on migration.
 _Avoid_: User, Profile
 
 **Guest**:
@@ -21,6 +21,10 @@ The collection of Tracked Profiles belonging to an Account.
 A lightweight person record an Account creates to run Quick Count for someone else — a name with no login or Account of their own. Not visible or accessible to the person it represents.
 _Avoid_: Student, Coachee, Buddy
 
+**Activity Level**:
+An Account's self-reported daily activity intensity — Low, Medium, or High — collected alongside its other body-stats and combined with BMI/age to tune Routine difficulty.
+_Avoid_: Fitness level, Intensity (ambiguous with a Routine's own difficulty tier)
+
 ### Exercises & tracking
 
 **Exercise**:
@@ -31,7 +35,7 @@ One complete cycle of an Exercise's motion, detected by that Exercise's state ma
 _Avoid_: Repetition (fine in prose, but code/data should say Rep)
 
 **Form Score**:
-A quality measure for a completed Set, derived from how many of its Reps passed the Exercise's range-of-motion/angle threshold. Quick Count Tallies never have a Form Score — they're raw counts.
+A quality measure derived from how many of a run's Reps passed the Exercise's range-of-motion/angle threshold — computed the same way for a Set and a Quick Count Tally alike. (Earlier versions of this app deliberately withheld Form Score from Quick Count; that decision was reversed.)
 _Avoid_: Accuracy, Quality score
 
 ### Self-tracking (Routines)
@@ -72,9 +76,9 @@ An Account's highest recorded rep count or Form Score for a given Exercise, acro
 ### Quick Count
 
 **Quick Count**:
-The mode where an Account records Reps for a Tracked Profile rather than themselves: pick a Tracked Profile, pick an Exercise, optionally set a target, run the camera, get a Tally. Uses the same rep-detection engine as Sets, but with no Form Score gating.
+The mode where an Account records Reps for a Tracked Profile rather than themselves: pick a Tracked Profile, pick an Exercise, optionally set a target, run the camera, get a Tally. Uses the same rep-detection engine as Sets, with no Form Score *gating* — every Rep still counts toward the total regardless of form — but its Tally does report the run's total reps, total time, and average Form Score.
 _Avoid_: Coach mode, Roster mode
 
 **Tally**:
-The record produced by one Quick Count run — Tracked Profile, Exercise, reps achieved, optional target, timestamp. Belongs to the Tracked Profile, not to the Account's own Session/Streak history.
+The record produced by one Quick Count run — Tracked Profile, Exercise, reps achieved, optional target, timestamp, total time, and average Form Score. Belongs to the Tracked Profile, not to the Account's own Session/Streak history.
 _Avoid_: Count (ambiguous with "rep count"), Quick Set

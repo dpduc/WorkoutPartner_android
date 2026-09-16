@@ -34,6 +34,34 @@ class TallyRepositoryTest {
     }
 
     @Test
+    fun `recordTally persists formScore and durationSeconds when supplied`() = runTest {
+        val profileId = seedTrackedProfile()
+
+        val tally = tallyRepository.recordTally(
+            trackedProfileId = profileId, exercise = Exercise.SQUAT, repsAchieved = 10, target = null,
+            timestamp = Instant.parse("2024-01-01T10:00:00Z"), formScore = 75, durationSeconds = 42,
+        )
+
+        val stored = db.tallyDao().getById(tally.id)!!
+        assertEquals(75, stored.formScore)
+        assertEquals(42, stored.durationSeconds)
+    }
+
+    @Test
+    fun `recordTally defaults formScore and durationSeconds to null when not supplied`() = runTest {
+        val profileId = seedTrackedProfile()
+
+        val tally = tallyRepository.recordTally(
+            trackedProfileId = profileId, exercise = Exercise.SQUAT, repsAchieved = 10, target = null,
+            timestamp = Instant.parse("2024-01-01T10:00:00Z"),
+        )
+
+        val stored = db.tallyDao().getById(tally.id)!!
+        assertNull(stored.formScore)
+        assertNull(stored.durationSeconds)
+    }
+
+    @Test
     fun `a Tally with no target records target as null, not zero`() = runTest {
         val profileId = seedTrackedProfile()
 

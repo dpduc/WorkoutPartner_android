@@ -20,9 +20,26 @@ sealed interface AppScreen {
     data object Welcome : AppScreen
     data object SignUp : AppScreen
     data object SignIn : AppScreen
+
+    /**
+     * Body-stats capture (`workout-partner-v2` ticket 01), shown once right
+     * after choosing Guest or completing Sign up — never after Sign in,
+     * since an existing Account already answered this at its own sign-up.
+     */
+    data object ProfileSetup : AppScreen
+
+    /**
+     * The app's true home screen (`workout-partner-v2` ticket 02): two
+     * top-level sections, Workouts ([RoutinePicker]'s pre-built Routines)
+     * and Quick Count ([Roster]), plus Progress/Settings/Sign-up in an
+     * overflow menu — [RoutinePicker] used to carry that overflow menu
+     * itself; it's now purely the Routine list.
+     */
+    data object MainMenu : AppScreen
     data object RoutinePicker : AppScreen
     data class Session(val routine: RoutineWithSteps) : AppScreen
     data object Progress : AppScreen
+    data object Settings : AppScreen
     data object Roster : AppScreen
     data class QuickCountSetup(val profile: TrackedProfileEntity) : AppScreen
     data class QuickCountRun(val profile: TrackedProfileEntity, val exercise: Exercise, val target: Int?) : AppScreen
