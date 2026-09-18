@@ -37,6 +37,13 @@ sealed interface AppScreen {
      */
     data object MainMenu : AppScreen
     data object RoutinePicker : AppScreen
+
+    /**
+     * The Workout Overview (`workout-partner-v3` ticket 03): between
+     * picking a Routine and its first Set — see
+     * [com.workoutpartner.app.beforeyoustart.WorkoutOverviewScreen].
+     */
+    data class WorkoutOverview(val routine: RoutineWithSteps) : AppScreen
     data class Session(val routine: RoutineWithSteps) : AppScreen
     data object Progress : AppScreen
     data object Settings : AppScreen

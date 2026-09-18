@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.workoutpartner.app.beforeyoustart.WorkoutOverviewScreen
 import com.workoutpartner.app.data.BundledRoutines
 import com.workoutpartner.app.di.AppContainer
 import com.workoutpartner.app.onboarding.DisclaimerScreen
@@ -231,7 +232,23 @@ fun WorkoutPartnerApp(container: AppContainer) {
             RoutinePickerScreen(
                 routines = routines,
                 difficultyTier = difficultyTier,
-                onRoutineSelected = { screen = AppScreen.Session(it) },
+                onRoutineSelected = { screen = AppScreen.WorkoutOverview(it) },
+                modifier = Modifier.padding(padding),
+            )
+        }
+        is AppScreen.WorkoutOverview -> Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(current.routine.routine.name) },
+                    navigationIcon = { TextButton(onClick = { screen = AppScreen.RoutinePicker }) { Text("Back") } },
+                )
+            },
+        ) { padding ->
+            WorkoutOverviewScreen(
+                routine = current.routine,
+                difficultyTier = difficultyTier,
+                onReviewForm = {},
+                onStart = { screen = AppScreen.Session(current.routine) },
                 modifier = Modifier.padding(padding),
             )
         }
