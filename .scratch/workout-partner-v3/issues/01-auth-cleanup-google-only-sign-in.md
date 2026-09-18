@@ -13,4 +13,12 @@
 - [ ] Phone/SMS UI (entry field, code-verification step) is removed from the auth screens; Google sign-in UI remains.
 - [ ] `app/build.gradle.kts` / `gradle/libs.versions.toml`: the `com.google.gms.google-services` plugin and Credential Manager + Google ID dependencies stay; any phone-auth-only dependency is removed if one was added.
 - [ ] `AndroidManifest.xml` reflects the same (no phone-auth-only manifest entries left over).
-- [ ] Existing `FakeAuthGateway`-based auth tests still pass; a new case covers the local-mode Google sign-in error message.
+- [x] Existing `FakeAuthGateway`-based auth tests still pass; a new case covers the local-mode Google sign-in error message.
+
+## Comments
+
+Implemented as spec'd, plus one correction found in review: `AuthRepository.signInWithGoogle` was calling `ensureLocalAccount()`, which unconditionally created a local Account row and auto-claimed any unclaimed Guest data on every Google sign-in — the exact "Google sign-in silently claims any Guest data" bug the spec's problem statement names, and precisely the behavior ticket 05's pending/merge/discard contract exists to replace. Rather than ship that regression for three tickets, `signInWithGoogle` now delegates straight through like `signIn` does (touches no local Account/Guest state), matching user story 2 ("Google sign-in to behave exactly like email sign-in with respect to my Guest data"). `ensureLocalAccount` is deleted — it had no other caller once phone sign-in was removed.
+
+No phone-auth-only Gradle dependency or manifest entry existed to remove (phone verification used Firebase's built-in `PhoneAuthProvider`, no extra artifact); `app/build.gradle.kts`, `AndroidManifest.xml`, `gradle/libs.versions.toml` were already correct from the prior uncommitted work and needed no changes here.
+
+Reviewed via `/code-review` (Standards + Spec axes) before commit; both findings above came from that review.
