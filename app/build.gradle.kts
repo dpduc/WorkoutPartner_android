@@ -6,11 +6,7 @@ plugins {
     // Kotlin compilation comes from AGP's built-in Kotlin support (AGP 9+);
     // org.jetbrains.kotlin.android is deliberately not applied here.
     alias(libs.plugins.kotlin.compose)
-    // google-services is declared (apply false) at the root but NOT applied
-    // here yet: it requires a real Firebase project's google-services.json,
-    // which doesn't exist yet (provisioning that is a human/wizard step, not
-    // part of this scaffold). Apply it once that file lands, likely with
-    // ticket 07 (auth module) or 14 (Firestore schema/security rules).
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -63,6 +59,10 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+    implementation(libs.play.services.auth)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

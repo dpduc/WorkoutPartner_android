@@ -55,6 +55,8 @@ class LocalAuthGateway(context: Context) : AuthGateway {
         return userId
     }
 
+    override suspend fun signInWithGoogle(idToken: String): String = throw GoogleSignInUnavailableException()
+
     override suspend fun signOut() {
         prefs.edit().remove(KEY_CURRENT_USER_ID).apply()
         currentUserId.value = null

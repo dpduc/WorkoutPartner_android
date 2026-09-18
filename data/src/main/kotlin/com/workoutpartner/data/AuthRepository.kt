@@ -54,5 +54,15 @@ class AuthRepository(
      */
     suspend fun signIn(email: String, password: String): String = authGateway.signInWithEmail(email, password)
 
+    /**
+     * Signs in with a Google ID token and returns the Account's id. Behaves
+     * exactly like [signIn] with respect to local state and Guest data —
+     * touches neither. Auto-claiming Guest data on sign-in (this method
+     * used to do so unconditionally) is exactly the bug
+     * `workout-partner-v3` ticket 01 exists to remove; the real pending/
+     * merge/discard sign-in contract is ticket 05's job, not this one's.
+     */
+    suspend fun signInWithGoogle(idToken: String): String = authGateway.signInWithGoogle(idToken)
+
     suspend fun signOut() = authGateway.signOut()
 }

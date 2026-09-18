@@ -8,10 +8,9 @@ import kotlinx.coroutines.flow.Flow
  * [AuthRepository] against a fake instead, the same split ticket 06 used
  * for [RemoteSyncGateway]/[SyncEngine].
  *
- * Email/password only (ticket 07's scope: "implement email/password as the
- * baseline; treat 'or a provider' as an easy extension point, not a hard v1
- * requirement"). Adding a provider later means adding another
- * `signUpWith*`/`signInWith*` pair here, not redesigning this interface.
+ * Email/password plus Google sign-in — no phone/SMS, and no Android UI
+ * types on this interface. Adding another provider later means adding
+ * another `signUpWith*`/`signInWith*` pair here, not redesigning it.
  */
 interface AuthGateway {
     /** The signed-in Firebase UID, or null while a Guest — see [AuthState]. */
@@ -23,5 +22,17 @@ interface AuthGateway {
     /** Returns the existing Firebase UID. Throws on failure (e.g. wrong password, no such account). */
     suspend fun signInWithEmail(email: String, password: String): String
 
+    /**
+     * Returns the Firebase UID after authenticating with a Google ID token.
+     * [LocalAuthGateway] (no Firebase configured) throws
+     * [GoogleSignInUnavailableException] rather than faking a provider it
+     * can't honestly offer.
+     */
+    suspend fun signInWithGoogle(idToken: String): String
+
     suspend fun signOut()
 }
+
+/** Thrown by [signInWithGoogle] when there's no real Google provider behind it — see [LocalAuthGateway]. */
+class GoogleSignInUnavailableException :
+    Exception("Google sign-in isn't available in local mode — sign in with email instead.")

@@ -32,6 +32,12 @@ class FakeAuthGateway : AuthGateway {
         return uid
     }
 
+    override suspend fun signInWithGoogle(idToken: String): String {
+        val uid = "fake_google_$idToken"
+        currentUserId.value = uid
+        return uid
+    }
+
     override suspend fun signOut() {
         currentUserId.value = null
     }

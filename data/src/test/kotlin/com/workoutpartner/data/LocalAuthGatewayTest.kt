@@ -102,4 +102,14 @@ class LocalAuthGatewayTest {
 
         assertNull(gateway.currentUserId.first())
     }
+
+    @Test
+    fun `Google sign-in is unavailable in local mode, with a friendly message`() = runTest {
+        try {
+            newGateway().signInWithGoogle("some-id-token")
+            fail("Expected GoogleSignInUnavailableException but nothing was thrown")
+        } catch (e: GoogleSignInUnavailableException) {
+            assertEquals("Google sign-in isn't available in local mode — sign in with email instead.", e.message)
+        }
+    }
 }
