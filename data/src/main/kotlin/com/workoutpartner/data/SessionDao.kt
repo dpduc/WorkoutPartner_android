@@ -28,4 +28,8 @@ interface SessionDao {
      */
     @Query("UPDATE sessions SET accountId = :accountId WHERE accountId IS NULL")
     suspend fun claimUnowned(accountId: String)
+
+    /** Permanently removes every unowned (Guest) Session — cascades to their Sets (`workout-partner-v3` ticket 05's Discard). */
+    @Query("DELETE FROM sessions WHERE accountId IS NULL")
+    suspend fun deleteUnowned()
 }

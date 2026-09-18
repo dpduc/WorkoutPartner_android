@@ -24,4 +24,12 @@ interface TrackedProfileDao {
      */
     @Query("SELECT * FROM tracked_profiles WHERE accountId IS :accountId ORDER BY displayName ASC")
     suspend fun getForAccount(accountId: String?): List<TrackedProfileEntity>
+
+    /** Re-points every unowned (Guest) Tracked Profile at [accountId] in one write, mirroring [SessionDao.claimUnowned] (`workout-partner-v3` ticket 05). */
+    @Query("UPDATE tracked_profiles SET accountId = :accountId WHERE accountId IS NULL")
+    suspend fun claimUnowned(accountId: String)
+
+    /** Permanently removes every unowned (Guest) Tracked Profile — cascades to their Tallies (`workout-partner-v3` ticket 05's Discard). */
+    @Query("DELETE FROM tracked_profiles WHERE accountId IS NULL")
+    suspend fun deleteUnowned()
 }

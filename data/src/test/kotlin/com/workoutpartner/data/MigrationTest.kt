@@ -28,7 +28,9 @@ import org.robolectric.annotation.Config
 class MigrationTest {
 
     @Test
-    fun `migrating 2 to 3 adds account profile columns, the guest_profile table, and tally columns`() {
+    // Short method name deliberately: see the "migrating 4 to 5 defaults
+    // guest_profile's" test below for why.
+    fun `migrating 2 to 3 adds profile columns, guest_profile, tally columns`() {
         val configuration = SupportSQLiteOpenHelper.Configuration.builder(ApplicationProvider.getApplicationContext())
             .name("migration-test.db")
             .callback(
@@ -196,7 +198,9 @@ class MigrationTest {
     }
 
     @Test
-    fun `migrating 4 to 5 makes tracked_profiles accountId nullable while preserving existing rows`() {
+    // Short method name deliberately: see the "migrating 4 to 5 defaults
+    // guest_profile's" test below for why.
+    fun `migrating 4 to 5 makes tracked_profiles accountId nullable`() {
         val db = openV4Database("migration-test-4-5-tracked-profiles.db")
         db.execSQL(
             "INSERT INTO accounts (id, weeklyTarget, bankedShields, currentStreak, notificationsEnabled) " +
@@ -268,7 +272,11 @@ class MigrationTest {
     }
 
     @Test
-    fun `migrating 4 to 5 gives guest_profile streak columns with correct defaults and nullable body-stats`() {
+    // Short method name deliberately: Robolectric embeds it verbatim into a
+    // temp directory path, and the original longer name pushed that path
+    // past Windows' 260-char MAX_PATH, causing an intermittent
+    // SQLiteCantOpenDatabaseException unrelated to this test's actual logic.
+    fun `migrating 4 to 5 defaults guest_profile's new columns, nulls body-stats`() {
         val db = openV4Database("migration-test-4-5-guest-profile.db")
         db.execSQL(
             "INSERT INTO guest_profile (id, name, age, heightCm, weightKg, activityLevel) " +

@@ -10,7 +10,6 @@ import com.workoutpartner.data.AuthGateway
 import com.workoutpartner.data.AuthRepository
 import com.workoutpartner.data.FirebaseAuthGateway
 import com.workoutpartner.data.FirestoreSyncGateway
-import com.workoutpartner.data.GuestAccountMigration
 import com.workoutpartner.data.LocalAuthGateway
 import com.workoutpartner.data.RemoteSyncGateway
 import com.workoutpartner.data.RosterRepository
@@ -60,11 +59,7 @@ class AppContainer(context: Context) {
     }
     val remoteSyncGateway: RemoteSyncGateway by lazy { FirestoreSyncGateway(FirebaseFirestore.getInstance()) }
 
-    val guestAccountMigration = GuestAccountMigration(accountRepository)
-
-    val authRepository: AuthRepository by lazy {
-        AuthRepository(authGateway, accountRepository, onGuestDataToMigrate = guestAccountMigration::invoke)
-    }
+    val authRepository: AuthRepository by lazy { AuthRepository(authGateway, accountRepository) }
 
     val syncEngine: SyncEngine by lazy {
         SyncEngine(

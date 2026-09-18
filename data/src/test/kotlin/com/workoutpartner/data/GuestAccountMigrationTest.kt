@@ -1,32 +1,25 @@
 package com.workoutpartner.data
 
 import com.workoutpartner.core.repcounting.Exercise
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Clock
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneOffset
 
 /**
- * Per spec.md's Testing Decisions: "the Guest → Account migration
- * transaction is tested against an in-memory Room database and a fake
- * remote, alongside ticket 06's sync tests" — these exercise the real
- * [GuestAccountMigration] wired into [AuthRepository] (not a test-double
- * lambda, unlike ticket 07's own `AuthRepositoryTest`), together with
- * [SyncEngine] and a [FakeRemoteSyncGateway].
+ * The Guest -> Account migration scenario, integration-style: a real
+ * [AuthRepository] wired to a real [AccountRepository] (not a test-double
+ * hook — `workout-partner-v3` ticket 05 made [AuthRepository.signUp]
+ * call [AccountRepository.claimGuestData] directly, so there's no separate
+ * migration object to inject anymore), together with [SyncEngine] and a
+ * [FakeRemoteSyncGateway]. Narrower `AuthRepository`-only contract tests
+ * (pending/Merge/Discard/Cancel/a failing claim) live in [AuthRepositoryTest].
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -36,9 +29,8 @@ class GuestAccountMigrationTest {
     private val accountRepository = AccountRepository(db)
     private val setRepository = SetRepository(db, accountRepository)
     private val clock = Clock.fixed(Instant.parse("2024-01-05T12:00:00Z"), ZoneOffset.UTC)
-    private val migration = GuestAccountMigration(accountRepository, clock)
     private val authGateway = FakeAuthGateway()
-    private val authRepository = AuthRepository(authGateway, accountRepository, onGuestDataToMigrate = migration::invoke)
+    private val authRepository = AuthRepository(authGateway, accountRepository, clock)
     private val remote = FakeRemoteSyncGateway()
     private val syncEngine = SyncEngine(db.pendingSyncDao(), db.setDao(), db.tallyDao(), db.sessionDao(), db.trackedProfileDao(), remote)
 
@@ -59,45 +51,6 @@ class GuestAccountMigrationTest {
         assertEquals(1, account.bankedShields)
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test
-    fun `signUp suspends until migration actually completes — not a background job with a visible in-progress window`() = runTest {
-        // A plain post-condition check after signUp returns wouldn't tell
-        // "properly awaited" apart from "launched as a background job that
-        // happened to finish before the assertions ran" — runTest's
-        // scheduler drains both the same way. A gate that only releases on
-        // command is what actually distinguishes them: if signUp returned
-        // early, the assertions below would run before the gate opens.
-        val routineId = seedRoutine()
-        val guestSession = setRepository.startSession(accountId = null, routineId = routineId, timestamp = Instant.parse("2024-01-01T10:00:00Z"))
-        recordOn(guestSession.id, "2024-01-01T10:00:00Z")
-
-        val migrationGate = CompletableDeferred<Unit>()
-        var migrationCompleted = false
-        val gatedRepository = AuthRepository(
-            FakeAuthGateway(),
-            accountRepository,
-            onGuestDataToMigrate = { accountId ->
-                migrationGate.await()
-                accountRepository.claimGuestData(accountId, LocalDate.of(2024, 1, 1), ZoneOffset.UTC)
-                migrationCompleted = true
-            },
-        )
-
-        val signUpJob = launch { gatedRepository.signUp("gated@example.com", "hunter2") }
-        runCurrent() // let signUp run up to the point it's suspended on the gate, no further
-
-        assertFalse("migration must not have completed yet", migrationCompleted)
-        assertFalse("signUp must not have returned yet", signUpJob.isCompleted)
-        assertNull("no partial re-ownership while migration is still pending", db.sessionDao().getById(guestSession.id)!!.accountId)
-
-        migrationGate.complete(Unit)
-        signUpJob.join()
-
-        assertTrue(migrationCompleted)
-        assertNotNull(db.sessionDao().getById(guestSession.id)!!.accountId)
-    }
-
     @Test
     fun `the Guest's pre-signup Sets still sync to the remote after migration re-owns them`() = runTest {
         val routineId = seedRoutine()
@@ -109,23 +62,6 @@ class GuestAccountMigrationTest {
 
         assertEquals(SyncResult(succeeded = 1, remaining = 0), result)
         assertEquals(listOf(set.id), remote.pushedSets.map { it.id })
-    }
-
-    @Test
-    fun `signing up as a Guest with a saved GuestProfile claims it onto the new Account`() = runTest {
-        accountRepository.saveGuestProfile(
-            name = "Alex", age = 29, heightCm = 175, weightKg = 70.0, activityLevel = ActivityLevel.LIGHTLY_ACTIVE,
-        )
-        val routineId = seedRoutine()
-        val guestSession = setRepository.startSession(accountId = null, routineId = routineId, timestamp = Instant.parse("2024-01-01T10:00:00Z"))
-        recordOn(guestSession.id, "2024-01-01T10:00:00Z")
-
-        val accountId = authRepository.signUp("new@example.com", "hunter2")
-
-        val account = accountRepository.getAccount(accountId)!!
-        assertEquals("Alex", account.name)
-        assertEquals(ActivityLevel.LIGHTLY_ACTIVE, account.activityLevel)
-        assertNull(accountRepository.getGuestProfile())
     }
 
     @Test

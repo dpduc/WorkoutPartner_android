@@ -58,7 +58,11 @@ fun SignInScreen(authRepository: AuthRepository, onSignedIn: (accountId: String)
         submitLabel = "Sign in",
         authRepository = authRepository,
         onCancel = onCancel,
-        onSubmitEmail = { email, password -> authRepository.signIn(email, password) },
+        // The SignInResult.GuestDataPending case isn't acted on here yet —
+        // ticket 05 is data-layer only; the real merge/discard prompt is
+        // ticket 09's. For now this behaves exactly as it did before:
+        // sign in succeeds, any pending Guest data just stays pending.
+        onSubmitEmail = { email, password -> authRepository.signIn(email, password).accountId },
         onSuccess = onSignedIn,
     )
 }
@@ -200,7 +204,9 @@ private fun GoogleSignInButton(
                     val result = credentialManager.getCredential(context = context, request = request)
                     val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(result.credential.data)
                     val idToken = googleIdTokenCredential.idToken
-                    val accountId = authRepository.signInWithGoogle(idToken)
+                    // Same "pending Guest data isn't acted on yet" deferral
+                    // as SignInScreen's email path above — ticket 09's job.
+                    val accountId = authRepository.signInWithGoogle(idToken).accountId
                     onSuccess(accountId)
                 } catch (e: CancellationException) {
                     throw e

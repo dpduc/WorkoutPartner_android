@@ -94,7 +94,7 @@ timeline
 * **Important:** don't wrap `authGateway` itself in `runCatching`/`getOrElse`. `AppContainer`'s current doc comment explains that nullability was deliberately moved *one level up*, to `authRepository`, after a `/code-review` flagged per-gateway fallback as error-prone — every consumer would have had to remember to re-wrap it. `authGateway` today is a plain `by lazy { FirebaseAuthGateway(FirebaseAuth.getInstance()) }`, and the `runCatching` lives around the `AuthRepository(...)` construction instead:
   ```kotlin
   val authRepository: AuthRepository? by lazy {
-      runCatching { AuthRepository(authGateway, accountRepository, onGuestDataToMigrate = guestAccountMigration::invoke) }.getOrNull()
+      runCatching { AuthRepository(authGateway, accountRepository) }.getOrNull()
   }
   ```
 * Phase 1 needs to fit *into* that existing shape rather than reintroduce gateway-level wrapping. The cleanest fit: make `authGateway` itself resolve to `LocalAuthGateway` whenever Firebase isn't available, so `authRepository` construction always succeeds and is never `null` for that reason — for example:
@@ -105,7 +105,7 @@ timeline
   }
 
   val authRepository: AuthRepository by lazy {
-      AuthRepository(authGateway, accountRepository, onGuestDataToMigrate = guestAccountMigration::invoke)
+      AuthRepository(authGateway, accountRepository)
   }
   ```
   This still keeps the "who touches Firebase and when" logic in one place (this class), it just relocates the fallback back to the gateway boundary now that there's a real, non-throwing alternative (`LocalAuthGateway`) to fall back to — the earlier code review's objection was about swallowing a *hard failure* per call site, not about the gateway seam itself.
@@ -128,6 +128,8 @@ When a Guest calls `authRepository.signUp()`:
    - Updates `SessionEntity.accountId` from `null` &rarr; `newAccountId` for every unowned Session.
    - Recomputes that account's `currentStreak`/`bankedShields` from its now-complete Set history via `StreakCalculator`.
    - **Does not separately enqueue anything into `pending_sync`** — every Set is already enqueued at write time by `SetRepository.recordSet`, regardless of ownership, so a Guest's Sets are never withheld from the sync queue while unowned. Migration only changes *who owns* the row, not whether it's queued to sync.
+
+**Superseded by `workout-partner-v3` ticket 05:** `GuestAccountMigration.kt` (the thin `onGuestDataToMigrate` hook wrapper this section describes) is deleted — `AuthRepository.signUp` calls `AccountRepository.claimGuestData` directly. The migration contract itself also widened well beyond this section's description: it now also claims unowned Tracked Profiles/Tallies and the Guest's Weekly Target (Tallies are no longer out of scope — `TrackedProfileEntity.accountId` became nullable in ticket 02), and sign-in no longer silently ignores pending Guest data — it reports it via `SignInResult.GuestDataPending` for the Athlete to resolve with `AccountRepository.mergeGuestData`/`discardGuestData`. See that ticket's file for the current contract.
 
 ---
 

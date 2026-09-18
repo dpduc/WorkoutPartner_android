@@ -10,10 +10,9 @@ import java.time.ZoneId
  * `AccountRepository` (spec.md's Seam 3 module list): local, Room-backed
  * Account CRUD, keeping the cached [AccountEntity.currentStreak]/
  * [AccountEntity.bankedShields] columns in sync via [recomputeStreak], and
- * [claimGuestData] — the atomic re-ownership primitive ticket 08's Guest ->
- * Account migration transaction is built on (per this ticket's own scope:
- * "this ticket just needs to expose whatever primitive the migration needs
- * ... this ticket does not own the migration's business rules").
+ * the three atomic Guest-data transactions [AuthRepository] is built on
+ * (`workout-partner-v3` ticket 05): [claimGuestData] (sign-up),
+ * [mergeGuestData] (sign-in to an existing Account), and [discardGuestData].
  *
  * No Firestore sync here: Account rows aren't in this ticket's "Sets and
  * Tallies" sync-queue scope (see [SyncEngine]'s doc comment) — Account
@@ -27,6 +26,9 @@ class AccountRepository(
     private val sessionDao: SessionDao = database.sessionDao(),
     private val setDao: SetDao = database.setDao(),
     private val guestProfileDao: GuestProfileDao = database.guestProfileDao(),
+    private val trackedProfileDao: TrackedProfileDao = database.trackedProfileDao(),
+    private val tallyDao: TallyDao = database.tallyDao(),
+    private val pendingSyncDao: PendingSyncDao = database.pendingSyncDao(),
 ) {
     suspend fun getAccount(accountId: String): AccountEntity? = accountDao.getById(accountId)
 
@@ -129,56 +131,141 @@ class AccountRepository(
         }
     }
 
-    /** Whether this device has any Guest Session ([SessionEntity.accountId] null) still waiting to be claimed — what ticket 07's Auth module checks before triggering migration on sign-up. */
-    suspend fun hasUnclaimedGuestData(): Boolean = sessionDao.getUnowned().isNotEmpty()
+    /**
+     * Whether this device has any Guest data still waiting to be claimed —
+     * what [AuthRepository] checks before triggering a claim on sign-up or
+     * reporting a sign-in as pending (`workout-partner-v3` ticket 05).
+     * Widened beyond unowned Sessions: an unowned Tracked Profile (a Guest's
+     * Roster, ticket 06) or a [GuestProfileEntity] row carrying real state —
+     * a customized Weekly Target, a banked Shield — count too, even with no
+     * Session ever started (a Quick-Count-only Guest).
+     */
+    suspend fun hasUnclaimedGuestData(): Boolean {
+        if (sessionDao.getUnowned().isNotEmpty()) return true
+        if (trackedProfileDao.getForAccount(null).isNotEmpty()) return true
+        return guestProfileDao.get()?.hasNonDefaultState() == true
+    }
+
+    /** The counts behind [hasUnclaimedGuestData] — what a Merge/Discard prompt (ticket 09) shows the Athlete before they choose. */
+    suspend fun unclaimedGuestDataSummary(): GuestDataSummary {
+        val unownedProfiles = trackedProfileDao.getForAccount(null)
+        return GuestDataSummary(
+            sessionCount = sessionDao.getUnowned().size,
+            trackedProfileCount = unownedProfiles.size,
+            tallyCount = unownedProfiles.sumOf { tallyDao.getForTrackedProfile(it.id).size },
+        )
+    }
 
     /**
-     * Re-points every unowned (Guest) Session at [accountId], refreshes that
-     * account's Streak from its now-complete history, and — if a
-     * [GuestProfileEntity] row exists (`workout-partner-v2` ticket 01) —
-     * copies its body-stats onto the new Account and clears the guest row.
-     * The Guest period counts in full, since it's the same Session/Set
-     * rows, just newly owned (see [AccountEntity]'s doc comment). All steps
-     * run in one transaction: a crash partway through should never leave a
-     * re-owned account with stale Streak columns or a half-claimed profile.
+     * Re-points every unowned (Guest) Session and Tracked Profile (and, via
+     * the latter, its Tallies — ownership there is inherited through
+     * [TrackedProfileEntity.accountId], not stored directly on
+     * [TallyEntity]) at [accountId], copies the Guest's body-stats and
+     * Weekly Target onto the new Account, refreshes its Streak from the
+     * now-complete history, and clears the Guest record. A brand new
+     * Account has nothing of its own to conflict with, so every field
+     * copies over unconditionally — contrast [mergeGuestData], where an
+     * *existing* Account's own values win.
      *
-     * This is the primitive, not the migration itself — ticket 08 also
-     * needs to touch Firestore/Auth, which is beyond this repository.
+     * The Weekly Target copy happens before [recomputeStreak] runs, not
+     * after: [recomputeStreak] computes Shields against whatever
+     * `weeklyTarget` the Account row currently has, so recomputing first
+     * would grade the Guest's history against the wrong target.
      *
-     * **Known gap, left to `workout-partner-v3` ticket 05:** since ticket 06
-     * (ADR-0007) a Guest's [GuestProfileEntity.weeklyTarget]/[GuestProfileEntity.currentStreak]/
-     * [GuestProfileEntity.bankedShields]/[GuestProfileEntity.notificationsEnabled]
-     * are real, user-set state, not just unused defaults — but this method
-     * still only copies body-stats onto the new Account and discards the
-     * rest via [GuestProfileDao.clear], and the [recomputeStreak] call above
-     * recomputes against the new Account's own (default) `weeklyTarget`,
-     * not the Guest's. A Guest who set a custom target and banked a Shield
-     * under it currently loses both on sign-up. Ticket 05 owns the actual
-     * sign-up/merge contract for this widened Guest state ("claims... Guest
-     * Weekly Target; recomputes Streak/Shields from the full Set history");
-     * re-flagged here rather than silently fixed, since ticket 05 also
-     * needs to decide Merge's "Account's existing target wins" case, which
-     * a plain copy here would get wrong for that path.
+     * All steps run in one transaction (`workout-partner-v3` ticket 05): a
+     * crash partway through leaves this device's Guest data exactly as
+     * unclaimed as it started, never half-moved.
+     *
+     * This is the primitive, not the sign-up flow itself — [AuthRepository.signUp]
+     * is what calls this after creating the Account.
      */
     suspend fun claimGuestData(accountId: String, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()) {
         database.withTransaction {
-            sessionDao.claimUnowned(accountId)
-            recomputeStreak(accountId, today, zone)
-            guestProfileDao.get()?.let { guestProfile ->
-                accountDao.getById(accountId)?.let { account ->
-                    accountDao.update(
-                        account.copy(
-                            name = guestProfile.name,
-                            age = guestProfile.age,
-                            heightCm = guestProfile.heightCm,
-                            weightKg = guestProfile.weightKg,
-                            activityLevel = guestProfile.activityLevel,
-                        ),
-                    )
-                }
-                guestProfileDao.clear()
+            claimSessionsAndTrackedProfiles(accountId)
+            applyGuestProfile(accountId) { account, guest ->
+                account.copy(
+                    name = guest.name,
+                    age = guest.age,
+                    heightCm = guest.heightCm,
+                    weightKg = guest.weightKg,
+                    activityLevel = guest.activityLevel,
+                    weeklyTarget = guest.weeklyTarget,
+                )
             }
+            recomputeStreak(accountId, today, zone)
         }
+    }
+
+    /**
+     * Folds pending Guest data onto an *existing* Account at sign-in
+     * (`workout-partner-v3` ticket 05; the Merge/Discard prompt itself is
+     * ticket 09's). Moves the same Sessions/Tracked Profiles
+     * [claimGuestData] does, but the Account's own Weekly Target and
+     * body-stats win — Guest body-stats fill in only the fields the
+     * Account doesn't already have an answer for (`?:`, field by field),
+     * and `weeklyTarget` is left untouched entirely, since (unlike a fresh
+     * Account) there's always an existing value here that should win.
+     * Streak/Shields are recomputed across the merged history either way.
+     */
+    suspend fun mergeGuestData(accountId: String, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()) {
+        database.withTransaction {
+            claimSessionsAndTrackedProfiles(accountId)
+            applyGuestProfile(accountId) { account, guest ->
+                account.copy(
+                    name = account.name ?: guest.name,
+                    age = account.age ?: guest.age,
+                    heightCm = account.heightCm ?: guest.heightCm,
+                    weightKg = account.weightKg ?: guest.weightKg,
+                    activityLevel = account.activityLevel ?: guest.activityLevel,
+                )
+            }
+            recomputeStreak(accountId, today, zone)
+        }
+    }
+
+    /**
+     * Permanently deletes every unowned Guest row (`workout-partner-v3`
+     * ticket 05; the confirmation UI is ticket 09's): Sessions and their
+     * Sets (cascade), Tracked Profiles and their Tallies (cascade), the
+     * Guest record, and any `pending_sync` entries queued for the
+     * Sets/Tallies about to disappear — `pending_sync` has no FK to what it
+     * queues, so cascading deletes alone would leave those orphaned. Set/
+     * Tally ids are read *before* the cascade-deletes below remove their
+     * parent rows, since there'd be nothing left to join against after.
+     * One transaction: a crash partway through leaves this device's Guest
+     * data exactly as unclaimed (and intact) as it started.
+     */
+    suspend fun discardGuestData() {
+        database.withTransaction {
+            val setIdsToDelete = sessionDao.getUnowned().flatMap { session -> setDao.getForSession(session.id).map { it.id } }
+            val tallyIdsToDelete = trackedProfileDao.getForAccount(null)
+                .flatMap { profile -> tallyDao.getForTrackedProfile(profile.id).map { it.id } }
+
+            pendingSyncDao.deleteByEntityIds(setIdsToDelete + tallyIdsToDelete)
+            sessionDao.deleteUnowned()
+            trackedProfileDao.deleteUnowned()
+            guestProfileDao.clear()
+        }
+    }
+
+    private suspend fun claimSessionsAndTrackedProfiles(accountId: String) {
+        sessionDao.claimUnowned(accountId)
+        trackedProfileDao.claimUnowned(accountId)
+    }
+
+    /**
+     * The shape [claimGuestData] and [mergeGuestData] share: if a
+     * [GuestProfileEntity] row exists, fold it onto [accountId]'s
+     * [AccountEntity] via [merge] and clear the Guest row — a no-op
+     * (neither the Account nor the Guest record is touched) if either row
+     * is missing. [merge] is the one thing the two callers disagree on:
+     * claim copies every Guest field unconditionally, merge keeps the
+     * Account's own values and only fills in what's missing.
+     */
+    private suspend fun applyGuestProfile(accountId: String, merge: (account: AccountEntity, guest: GuestProfileEntity) -> AccountEntity) {
+        val guestProfile = guestProfileDao.get() ?: return
+        accountDao.getById(accountId)?.let { account -> accountDao.update(merge(account, guestProfile)) }
+        guestProfileDao.clear()
     }
 }
 

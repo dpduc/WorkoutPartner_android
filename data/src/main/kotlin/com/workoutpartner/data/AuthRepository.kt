@@ -2,28 +2,29 @@ package com.workoutpartner.data
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.time.Clock
+import java.time.LocalDate
 
 /**
  * The Auth module (spec.md's module list): sign-up/sign-in, [authState]
- * (Guest vs. signed-in Account, per [AuthState]), and detecting + triggering
- * the Guest -> Account migration on sign-up (ticket 07's scope). Covers user
- * stories 1, 5, 6, 7.
+ * (Guest vs. signed-in Account, per [AuthState]), and — as of
+ * `workout-partner-v3` ticket 05 — the single seam for every Guest-data
+ * outcome on sign-up and sign-in. Covers user stories 1, 5, 6, 7, and
+ * ticket 05's widened sign-in/sign-up contract.
  *
- * [onGuestDataToMigrate] defaults to a no-op deliberately: this ticket's job
- * is the trigger — noticing a local Guest record exists and calling out —
- * not the migration transaction's own business rules (out of scope, per
- * this ticket's own text; ticket 08 owns those). Ticket 08 supplies the real
- * function, likely one that calls [AccountRepository.claimGuestData] (the
- * re-ownership primitive ticket 06 built) plus whatever else a full
- * transaction needs (e.g. deciding what happens if it fails partway —
- * `signUp` has already created the Firebase identity and local Account row
- * by the time this callback runs, so that's ticket 08's problem to design
- * for, not this default's).
+ * [clock] is where "today" comes from for the Streak recomputation
+ * [AccountRepository.claimGuestData]/[AccountRepository.mergeGuestData]
+ * need — this repository doesn't read the system clock inline, matching
+ * [AccountRepository]'s own "caller injects today" convention; unlike an
+ * app-layer ViewModel (which passes `today`/`zone` in explicitly, e.g.
+ * [com.workoutpartner.app.progress.ProgressViewModel]), sign-up/sign-in
+ * have no ViewModel of their own to hold one, so it's constructor-injected
+ * here instead — the same shape [TallyRepository]'s own `clock` param uses.
  */
 class AuthRepository(
     private val authGateway: AuthGateway,
     private val accountRepository: AccountRepository,
-    private val onGuestDataToMigrate: suspend (accountId: String) -> Unit = {},
+    private val clock: Clock = Clock.systemDefaultZone(),
 ) {
     val authState: Flow<AuthState> = authGateway.currentUserId.map { uid ->
         if (uid == null) AuthState.Guest else AuthState.SignedIn(uid)
@@ -31,38 +32,59 @@ class AuthRepository(
 
     /**
      * Creates a new Firebase identity and its local [AccountEntity], then
-     * calls [onGuestDataToMigrate] if this device has any Guest data
-     * ([AccountRepository.hasUnclaimedGuestData]) waiting to be claimed.
+     * claims every bit of this device's Guest data onto it
+     * ([AccountRepository.claimGuestData]) if any exists. A brand new
+     * Account never has anything of its own to conflict with, so sign-up
+     * claims unconditionally rather than asking — contrast [signIn]/
+     * [signInWithGoogle], which report pending data instead of touching it.
      */
     suspend fun signUp(email: String, password: String): String {
         val accountId = authGateway.signUpWithEmail(email, password)
         accountRepository.createAccount(accountId)
         if (accountRepository.hasUnclaimedGuestData()) {
-            onGuestDataToMigrate(accountId)
+            accountRepository.claimGuestData(accountId, today(), clock.zone)
         }
         return accountId
     }
 
     /**
-     * Signs in an existing Account and returns its id. Doesn't create or
-     * touch any local [AccountEntity] row — a fresh device signing into a
-     * pre-existing Account may have never cached one (ticket 06 has no
-     * pull-sync path yet, see [SyncEngine]'s doc comment), and fabricating a
-     * blank local row isn't something this ticket was asked to paper that
-     * gap over with. "Synced history should become visible" (this ticket's
-     * own text) stays genuinely unmet until that gap closes.
+     * Signs in an existing Account and reports whether this device's Guest
+     * data (if any) is now pending resolution — never claims it itself.
+     * Doesn't create or touch any local [AccountEntity] row otherwise — a
+     * fresh device signing into a pre-existing Account may have never
+     * cached one (no pull-sync path exists yet, see [SyncEngine]'s doc
+     * comment), and fabricating a blank local row isn't this method's job.
      */
-    suspend fun signIn(email: String, password: String): String = authGateway.signInWithEmail(email, password)
+    suspend fun signIn(email: String, password: String): SignInResult = resultFor(authGateway.signInWithEmail(email, password))
+
+    /** Signs in with a Google ID token. Behaves exactly like [signIn] with respect to local state and Guest data — see [resultFor]. */
+    suspend fun signInWithGoogle(idToken: String): SignInResult = resultFor(authGateway.signInWithGoogle(idToken))
+
+    private suspend fun resultFor(accountId: String): SignInResult =
+        if (accountRepository.hasUnclaimedGuestData()) {
+            SignInResult.GuestDataPending(accountId, accountRepository.unclaimedGuestDataSummary())
+        } else {
+            SignInResult.SignedIn(accountId)
+        }
 
     /**
-     * Signs in with a Google ID token and returns the Account's id. Behaves
-     * exactly like [signIn] with respect to local state and Guest data —
-     * touches neither. Auto-claiming Guest data on sign-in (this method
-     * used to do so unconditionally) is exactly the bug
-     * `workout-partner-v3` ticket 01 exists to remove; the real pending/
-     * merge/discard sign-in contract is ticket 05's job, not this one's.
+     * Resolves Guest data a [SignInResult.GuestDataPending] reported —
+     * Merge folds it into [accountId]'s existing history
+     * ([AccountRepository.mergeGuestData]), Discard permanently deletes it
+     * ([AccountRepository.discardGuestData]). Sign-in has already completed
+     * at the gateway by the time a caller has a [SignInResult.GuestDataPending]
+     * to resolve, so there's no "cancel this sign-in" case here — backing
+     * out of the prompt is just [signOut], leaving the Guest data as
+     * pending as it was (still unclaimed, still intact) for next time.
      */
-    suspend fun signInWithGoogle(idToken: String): String = authGateway.signInWithGoogle(idToken)
+    suspend fun resolvePendingGuestData(accountId: String, resolution: GuestDataResolution) {
+        when (resolution) {
+            GuestDataResolution.MERGE -> accountRepository.mergeGuestData(accountId, today(), clock.zone)
+            GuestDataResolution.DISCARD -> accountRepository.discardGuestData()
+        }
+    }
 
     suspend fun signOut() = authGateway.signOut()
+
+    private fun today(): LocalDate = LocalDate.now(clock)
 }
