@@ -203,7 +203,6 @@ fun WorkoutPartnerApp(container: AppContainer) {
                     title = { WorkoutPartnerBrandLogo(orientation = LogoOrientation.HORIZONTAL, size = 36.dp) },
                     actions = {
                         OverflowMenu(
-                            isAccountHolder = accountId != null,
                             onProgress = { screen = AppScreen.Progress },
                             onSettings = { screen = AppScreen.Settings },
                         )
@@ -213,11 +212,10 @@ fun WorkoutPartnerApp(container: AppContainer) {
         ) { padding ->
             MainMenuScreen(
                 onWorkouts = { screen = AppScreen.RoutinePicker },
-                // Quick Count is Account-holder-only (CONTEXT.md: Roster/
-                // Tracked Profile), same gating the old overflow menu's
-                // Roster-or-Sign-up branch had — just relocated to this
-                // tile now that Quick Count is a top-level section.
-                onQuickCount = { screen = if (accountId != null) AppScreen.Roster else AppScreen.SignUp },
+                // Quick Count works fully for a Guest since
+                // `workout-partner-v3` ticket 06 (ADR-0007) — no more
+                // Roster-or-Sign-up branch here.
+                onQuickCount = { screen = AppScreen.Roster },
                 modifier = Modifier.padding(padding),
             )
         }
@@ -297,6 +295,7 @@ fun WorkoutPartnerApp(container: AppContainer) {
                 authRepository = authRepository,
                 onSignedOut = { screen = AppScreen.MainMenu },
                 onSignUp = { screen = AppScreen.SignUp },
+                onSignIn = { screen = AppScreen.SignIn },
                 onViewProgress = { screen = AppScreen.Progress },
                 modifier = Modifier.padding(padding),
             )
@@ -316,27 +315,23 @@ fun WorkoutPartnerApp(container: AppContainer) {
                 modifier = Modifier.padding(padding),
             )
         }
-        AppScreen.Roster -> {
-            if (accountId == null) {
-                screen = AppScreen.MainMenu
-            } else {
-                Scaffold(
-                    topBar = {
-                        TopAppBar(
-                            title = { Text("Roster") },
-                            navigationIcon = { TextButton(onClick = { screen = AppScreen.MainMenu }) { Text("Back") } },
-                        )
-                    },
-                ) { padding ->
-                    RosterScreen(
-                        accountId = accountId,
-                        rosterRepository = container.rosterRepository,
-                        onProfileSelected = { screen = AppScreen.QuickCountSetup(it) },
-                        onViewHistory = { screen = AppScreen.TallyHistory(it) },
-                        modifier = Modifier.padding(padding),
-                    )
-                }
-            }
+        AppScreen.Roster -> Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Roster") },
+                    navigationIcon = { TextButton(onClick = { screen = AppScreen.MainMenu }) { Text("Back") } },
+                )
+            },
+        ) { padding ->
+            // accountId null (Guest) works the same as an Account holder's
+            // Roster — `workout-partner-v3` ticket 06 (ADR-0007).
+            RosterScreen(
+                accountId = accountId,
+                rosterRepository = container.rosterRepository,
+                onProfileSelected = { screen = AppScreen.QuickCountSetup(it) },
+                onViewHistory = { screen = AppScreen.TallyHistory(it) },
+                modifier = Modifier.padding(padding),
+            )
         }
         is AppScreen.QuickCountSetup -> QuickCountSetupScreen(
             profile = current.profile,
@@ -378,15 +373,17 @@ fun WorkoutPartnerApp(container: AppContainer) {
 
 /**
  * [AppScreen.MainMenu]'s own overflow menu: Progress and Settings. Roster/
- * Sign-up used to live here too (`isAccountHolder` branching between them)
- * before `workout-partner-v2` ticket 02 promoted Quick Count to its own
- * top-level tile on [MainMenuScreen] — kept as a plain top-bar overflow
- * rather than adding a third tile, since Progress/Settings aren't
- * first-class sections the way Workouts/Quick Count are.
+ * Sign-up used to live here too before `workout-partner-v2` ticket 02
+ * promoted Quick Count to its own top-level tile on [MainMenuScreen] — kept
+ * as a plain top-bar overflow rather than adding a third tile, since
+ * Progress/Settings aren't first-class sections the way Workouts/Quick
+ * Count are. Both entries work the same for a Guest and an Account holder
+ * (`workout-partner-v3` ticket 06, ADR-0007), so there's nothing left for
+ * this menu itself to branch on.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OverflowMenu(isAccountHolder: Boolean, onProgress: () -> Unit, onSettings: () -> Unit) {
+private fun OverflowMenu(onProgress: () -> Unit, onSettings: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     IconButton(onClick = { expanded = true }) {
         Icon(Icons.Default.MoreVert, contentDescription = "Menu")
@@ -400,9 +397,9 @@ private fun OverflowMenu(isAccountHolder: Boolean, onProgress: () -> Unit, onSet
 /**
  * The app's home screen (`workout-partner-v2` ticket 02): two top-level
  * sections — Workouts (pre-built Routines, tuned/tagged per
- * [com.workoutpartner.app.routines.RoutineDifficulty]) and Quick Count.
- * [onQuickCount] itself decides Roster-vs-Sign-up (Guest); this composable
- * doesn't need to know which.
+ * [com.workoutpartner.app.routines.RoutineDifficulty]) and Quick Count, both
+ * available to a Guest and an Account holder alike (`workout-partner-v3`
+ * ticket 06, ADR-0007).
  */
 @Composable
 private fun MainMenuScreen(onWorkouts: () -> Unit, onQuickCount: () -> Unit, modifier: Modifier = Modifier) {

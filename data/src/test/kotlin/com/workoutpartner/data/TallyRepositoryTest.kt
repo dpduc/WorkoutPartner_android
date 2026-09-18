@@ -84,10 +84,24 @@ class TallyRepositoryTest {
         assertEquals(listOf(newer.id, older.id), history.map { it.id })
     }
 
-    private suspend fun seedTrackedProfile(): String {
-        val account = AccountEntity(id = "account-1")
-        db.accountDao().insert(account)
-        val profile = TrackedProfileEntity(id = "profile-1", accountId = account.id, displayName = "Alex")
+    @Test
+    fun `recordTally works for a Tracked Profile belonging to a Guest (no Account)`() = runTest {
+        val profileId = seedTrackedProfile(accountId = null)
+
+        val tally = tallyRepository.recordTally(
+            trackedProfileId = profileId, exercise = Exercise.SQUAT, repsAchieved = 8, target = 10,
+            timestamp = Instant.parse("2024-01-01T10:00:00Z"),
+        )
+
+        assertEquals(tally, db.tallyDao().getById(tally.id))
+        assertEquals(listOf(tally.id), tallyRepository.getTalliesForTrackedProfile(profileId).map { it.id })
+    }
+
+    private suspend fun seedTrackedProfile(accountId: String? = "account-1"): String {
+        if (accountId != null) {
+            db.accountDao().insert(AccountEntity(id = accountId))
+        }
+        val profile = TrackedProfileEntity(id = "profile-1", accountId = accountId, displayName = "Alex")
         db.trackedProfileDao().insert(profile)
         return profile.id
     }

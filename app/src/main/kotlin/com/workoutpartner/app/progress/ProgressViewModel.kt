@@ -15,29 +15,22 @@ import java.time.Clock
 import java.time.LocalDate
 
 /**
- * The impure glue for the Progress/Streaks UI (ticket 10): reads an
- * Account's Weekly Target/Streak/Shields (ticket 04's Streak Calculator
- * output, cached on [com.workoutpartner.data.AccountEntity] since ticket 06)
- * and its full Set history, then hands both to the pure [ProgressStats]
- * aggregations for the heatmap/Personal Bests/trend. Not unit-tested itself
- * — a thin Room-backed fetch-and-cache layer; [ProgressStats] carries the
- * logic worth testing.
+ * The impure glue for the Progress/Streaks UI (ticket 10): reads the
+ * Athlete's Weekly Target/Streak/Shields (ticket 04's Streak Calculator
+ * output, cached on [com.workoutpartner.data.AccountEntity] or, for a Guest,
+ * [com.workoutpartner.data.GuestProfileEntity] since `workout-partner-v3`
+ * ticket 06/ADR-0007) and their full Set history, then hands both to the
+ * pure [ProgressStats] aggregations for the heatmap/Personal Bests/trend.
+ * Not unit-tested itself — a thin Room-backed fetch-and-cache layer;
+ * [ProgressStats] carries the logic worth testing.
  *
- * Account-holder only for this whole screen — a practical simplification,
- * not a literal reading of every story: stories 26 ("As an Account
- * holder, I want to set a Weekly Target...") and 32 are explicitly
- * Account-only, but 24/25 (Personal Bests, Form Score trend) are phrased
- * generically ("As a user..."). Gating the whole screen behind a non-null
- * `accountId` anyway is because ticket 06 exposes Set history only per
- * Account (`SetRepository.getSetsForAccount`) — there's no equivalent
- * Guest-scoped query this screen could fall back to — and because Streak/
- * Weekly Target genuinely have no meaning for a Guest (ticket 05/06's
- * reasoning) regardless. If a later ticket wants Guests to see their own
- * Personal Bests/trend, it needs a Guest-scoped Set query first, not just a
- * UI change here.
+ * [accountId] `null` reads/writes the device's single Guest's state instead
+ * of an [com.workoutpartner.data.AccountEntity] row — see
+ * [AccountRepository.recomputeStreak]/[AccountRepository.updateWeeklyTarget]
+ * and [SetRepository.getSetsForAccount] for the same convention.
  */
 class ProgressViewModel(
-    private val accountId: String,
+    private val accountId: String?,
     private val accountRepository: AccountRepository,
     private val setRepository: SetRepository,
     private val clock: Clock = Clock.systemDefaultZone(),
@@ -63,14 +56,25 @@ class ProgressViewModel(
 
     fun refresh() {
         viewModelScope.launch {
-            val account = accountRepository.getAccount(accountId) ?: return@launch
+            val id = accountId
+            val (weeklyTarget, currentStreak, bankedShields) = if (id != null) {
+                val account = accountRepository.getAccount(id) ?: return@launch
+                Triple(account.weeklyTarget, account.currentStreak, account.bankedShields)
+            } else {
+                val guest = accountRepository.getGuestProfile()
+                Triple(
+                    guest?.weeklyTarget ?: StreakCalculator.DEFAULT_WEEKLY_TARGET,
+                    guest?.currentStreak ?: 0,
+                    guest?.bankedShields ?: 0,
+                )
+            }
             val sets = setRepository.getSetsForAccount(accountId)
             lastSets = sets
             _uiState.value = UiState(
                 today = LocalDate.now(clock),
-                weeklyTarget = account.weeklyTarget,
-                currentStreak = account.currentStreak,
-                bankedShields = account.bankedShields,
+                weeklyTarget = weeklyTarget,
+                currentStreak = currentStreak,
+                bankedShields = bankedShields,
                 activeDays = ProgressStats.activeDays(sets, clock.zone),
                 personalBests = ProgressStats.personalBests(sets),
             )
@@ -81,12 +85,13 @@ class ProgressViewModel(
     fun formScoreTrend(exercise: Exercise): List<FormScorePoint> = ProgressStats.formScoreTrend(lastSets, exercise, clock.zone)
 
     /**
-     * Story 26: "I want to set a Weekly Target... editable by the Account."
-     * Also recomputes the cached Streak/Shields against the *new* target
-     * (`AccountRepository.recomputeStreak`) rather than leaving them stale
-     * until the next Set is logged — `StreakCalculator.calculate` takes
-     * `weeklyTarget` as an input, so changing it changes what the correct
-     * Streak/Shields are for the same history, per ticket 04/06's design.
+     * Story 26: "I want to set a Weekly Target..." — an Account's or, since
+     * ticket 06, a Guest's. Also recomputes the cached Streak/Shields
+     * against the *new* target (`AccountRepository.recomputeStreak`) rather
+     * than leaving them stale until the next Set is logged —
+     * `StreakCalculator.calculate` takes `weeklyTarget` as an input, so
+     * changing it changes what the correct Streak/Shields are for the same
+     * history, per ticket 04/06's design.
      */
     fun updateWeeklyTarget(newTarget: Int) {
         val clamped = newTarget.coerceIn(MIN_WEEKLY_TARGET, MAX_WEEKLY_TARGET)

@@ -16,10 +16,10 @@ import java.time.ZoneId
  *
  * [recordSet] does three things atomically: writes the [SetEntity] to Room
  * (offline-first, ADR-0002), enqueues it for [SyncEngine] to push to
- * Firestore once online, and — for a signed-in Account's Session, not a
- * Guest's — refreshes that Account's cached Streak via
- * [AccountRepository.recomputeStreak], since a new Set may have just logged
- * a new Active Day.
+ * Firestore once online, and refreshes the Set's owner's cached Streak via
+ * [AccountRepository.recomputeStreak] — an Account's or, since
+ * `workout-partner-v3` ticket 06 (ADR-0007), a Guest's — since a new Set may
+ * have just logged a new Active Day.
  *
  * That atomicity requires [accountRepository] to have been constructed from
  * this same [database] instance — [database.withTransaction] only covers
@@ -70,9 +70,9 @@ class SetRepository(
             setDao.insert(set)
             pendingSyncDao.insert(PendingSyncEntity(entityKind = SyncEntityKind.SET, entityId = set.id, enqueuedAt = clock.instant()))
 
-            val accountId = sessionDao.getById(sessionId)?.accountId
-            if (accountId != null) {
-                accountRepository.recomputeStreak(accountId, today, zone)
+            val session = sessionDao.getById(sessionId)
+            if (session != null) {
+                accountRepository.recomputeStreak(session.accountId, today, zone)
             }
         }
 
@@ -81,5 +81,6 @@ class SetRepository(
 
     suspend fun getSetsForSession(sessionId: String): List<SetEntity> = setDao.getForSession(sessionId)
 
-    suspend fun getSetsForAccount(accountId: String): List<SetEntity> = setDao.getForAccount(accountId)
+    /** [accountId] `null` returns the device's single Guest's Sets (`workout-partner-v3` ticket 06) — see [SetDao.getForAccount]. */
+    suspend fun getSetsForAccount(accountId: String?): List<SetEntity> = setDao.getForAccount(accountId)
 }

@@ -9,9 +9,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** Roster CRUD (ticket 11, spec.md user story 34): create/list Tracked Profiles. Thin Room-backed glue, not unit-tested — `RosterRepository` (ticket 06) already is. */
+/**
+ * Roster CRUD (ticket 11, spec.md user story 34): create/list Tracked
+ * Profiles. Thin Room-backed glue, not unit-tested — `RosterRepository`
+ * (ticket 06) already is. [accountId] `null` operates on the device's
+ * single Guest's Roster instead of an Account's (`workout-partner-v3`
+ * ticket 06, ADR-0007).
+ */
 class RosterViewModel(
-    private val accountId: String,
+    private val accountId: String?,
     private val rosterRepository: RosterRepository,
 ) : ViewModel() {
     private val _roster = MutableStateFlow<List<TrackedProfileEntity>>(emptyList())

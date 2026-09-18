@@ -1,6 +1,7 @@
 package com.workoutpartner.data
 
 import com.workoutpartner.core.repcounting.Exercise
+import com.workoutpartner.core.streaks.StreakCalculator
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -88,6 +89,55 @@ class AccountRepositoryTest {
         val migrated = accountRepository.getAccount(account.id)!!
         assertNull(migrated.name)
         assertNull(migrated.activityLevel)
+    }
+
+    @Test
+    fun `recordSet also recomputes a Guest's cached Streak, not just an Account's`() = runTest {
+        val routineId = seedRoutine()
+        val session = setRepository.startSession(accountId = null, routineId, Instant.parse("2024-01-01T10:00:00Z"))
+
+        recordOn(session.id, "2024-01-01T10:00:00Z")
+        recordOn(session.id, "2024-01-03T10:00:00Z")
+        recordOn(session.id, "2024-01-05T10:00:00Z")
+
+        val guest = accountRepository.getGuestProfile()!!
+        assertEquals(1, guest.currentStreak)
+        assertEquals(1, guest.bankedShields)
+    }
+
+    @Test
+    fun `updateWeeklyTarget for a Guest (null accountId) updates the GuestProfile row, not any Account`() = runTest {
+        val account = accountRepository.createAccount("account-1")
+
+        accountRepository.updateWeeklyTarget(accountId = null, weeklyTarget = 5)
+
+        assertEquals(5, accountRepository.getGuestProfile()!!.weeklyTarget)
+        assertEquals(StreakCalculator.DEFAULT_WEEKLY_TARGET, accountRepository.getAccount(account.id)!!.weeklyTarget)
+    }
+
+    @Test
+    fun `updateNotificationsEnabled for a Guest updates the GuestProfile row`() = runTest {
+        accountRepository.updateNotificationsEnabled(accountId = null, enabled = false)
+
+        assertEquals(false, accountRepository.getGuestProfile()!!.notificationsEnabled)
+    }
+
+    @Test
+    fun `saveGuestProfile does not stomp Streak state already accumulated on the Guest row`() = runTest {
+        accountRepository.updateWeeklyTarget(accountId = null, weeklyTarget = 5)
+        val routineId = seedRoutine()
+        val session = setRepository.startSession(accountId = null, routineId, Instant.parse("2024-01-01T10:00:00Z"))
+        recordOn(session.id, "2024-01-01T10:00:00Z")
+        val streakBeforeProfileSave = accountRepository.getGuestProfile()!!.currentStreak
+
+        accountRepository.saveGuestProfile(
+            name = "Alex", age = 29, heightCm = 175, weightKg = 70.0, activityLevel = ActivityLevel.LIGHTLY_ACTIVE,
+        )
+
+        val guest = accountRepository.getGuestProfile()!!
+        assertEquals("Alex", guest.name)
+        assertEquals(5, guest.weeklyTarget)
+        assertEquals(streakBeforeProfileSave, guest.currentStreak)
     }
 
     @Test

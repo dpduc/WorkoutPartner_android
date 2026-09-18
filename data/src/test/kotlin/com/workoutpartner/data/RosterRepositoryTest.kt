@@ -34,6 +34,32 @@ class RosterRepositoryTest {
         assertTrue(rosterRepository.getRoster(accountId).isEmpty())
     }
 
+    @Test
+    fun `a Guest (no Account) can create a Tracked Profile and it lands in the Guest's own Roster`() = runTest {
+        val profile = rosterRepository.createTrackedProfile(accountId = null, "Alex")
+
+        assertEquals(listOf(profile), rosterRepository.getRoster(null))
+    }
+
+    @Test
+    fun `a Guest's Roster and an Account's Roster don't leak into each other`() = runTest {
+        val accountId = seedAccount()
+        val guestProfile = rosterRepository.createTrackedProfile(accountId = null, "Guest's Alex")
+        val accountProfile = rosterRepository.createTrackedProfile(accountId, "Account's Sam")
+
+        assertEquals(listOf(guestProfile), rosterRepository.getRoster(null))
+        assertEquals(listOf(accountProfile), rosterRepository.getRoster(accountId))
+    }
+
+    @Test
+    fun `deleting a Guest's Tracked Profile removes it from the Guest's Roster`() = runTest {
+        val profile = rosterRepository.createTrackedProfile(accountId = null, "Alex")
+
+        rosterRepository.deleteTrackedProfile(profile)
+
+        assertTrue(rosterRepository.getRoster(null).isEmpty())
+    }
+
     private suspend fun seedAccount(): String {
         val account = AccountEntity(id = "account-1")
         db.accountDao().insert(account)

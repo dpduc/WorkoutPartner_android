@@ -2,7 +2,6 @@ package com.workoutpartner.app.progress
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,10 +45,9 @@ private const val HEATMAP_WEEKS = 12
 /**
  * Weekly Target/Streak/Shields, a calendar heatmap of Active Days, Personal
  * Bests, and a Form Score trend per Exercise (ticket 10, spec.md user
- * stories 24-26, 32). Account-holder only for the whole screen — see
- * [ProgressViewModel]'s doc comment for why, even though not every one of
- * those stories is itself Account-specific; shows a plain message instead
- * when [accountId] is null (Guest).
+ * stories 24-26, 32). Works fully for a Guest too, since `workout-partner-v3`
+ * ticket 06 (ADR-0007) — [accountId] `null` just points [ProgressViewModel]
+ * at the device's single Guest's state instead of an Account's.
  */
 @Composable
 fun ProgressScreen(
@@ -58,15 +56,6 @@ fun ProgressScreen(
     setRepository: SetRepository,
     modifier: Modifier = Modifier,
 ) {
-    if (accountId == null) {
-        Surface(modifier = modifier.fillMaxSize()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Sign up for an Account to track your Streak and progress.")
-            }
-        }
-        return
-    }
-
     val viewModel: ProgressViewModel = viewModel(
         factory = remember { viewModelFactory { initializer { ProgressViewModel(accountId, accountRepository, setRepository) } } },
     )

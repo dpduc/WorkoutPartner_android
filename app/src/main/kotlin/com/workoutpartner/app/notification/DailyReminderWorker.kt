@@ -37,9 +37,11 @@ import java.util.concurrent.TimeUnit
  * [AuthGateway] abstraction); `/code-review` caught it, see ticket 12's
  * Comments for the reasoning.
  *
- * "No notification for Guests without an Account" (this ticket's own scope
- * line) is checked via [AuthGateway.currentUserId] — null means Guest, the
- * same distinction [com.workoutpartner.data.AuthState] uses.
+ * [AuthGateway.currentUserId] null means Guest, the same distinction
+ * [com.workoutpartner.data.AuthState] uses — since `workout-partner-v3`
+ * ticket 06 (ADR-0007), a Guest can enable this reminder too, so that no
+ * longer skips the check; it instead reads the device's single Guest's
+ * [com.workoutpartner.data.GuestProfileEntity] row in place of an Account's.
  *
  * Not unit-tested itself — [ReminderPolicy] carries the logic worth
  * testing; this class is thin fetch-and-notify glue needing a real Android
@@ -57,13 +59,19 @@ class DailyReminderWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val accountId = authGateway.currentUserId.first() ?: return Result.success()
-
-        val account = accountRepository.getAccount(accountId) ?: return Result.success()
+        val accountId = authGateway.currentUserId.first()
         val today = LocalDate.now(clock)
         val activeDays = ProgressStats.activeDays(setRepository.getSetsForAccount(accountId), clock.zone)
 
-        if (ReminderPolicy.shouldRemind(activeDays, today, account.weeklyTarget, account.notificationsEnabled)) {
+        val (weeklyTarget, notificationsEnabled) = if (accountId != null) {
+            val account = accountRepository.getAccount(accountId) ?: return Result.success()
+            account.weeklyTarget to account.notificationsEnabled
+        } else {
+            val guest = accountRepository.getGuestProfile() ?: return Result.success()
+            guest.weeklyTarget to guest.notificationsEnabled
+        }
+
+        if (ReminderPolicy.shouldRemind(activeDays, today, weeklyTarget, notificationsEnabled)) {
             showNotification()
         }
         return Result.success()

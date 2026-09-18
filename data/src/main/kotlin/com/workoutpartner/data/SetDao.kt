@@ -22,14 +22,18 @@ interface SetDao {
      * `core-streaks.StreakCalculator`. Deliberately not pre-aggregated into
      * Active Days here: that needs a timezone/"today" policy, which is
      * application logic, not this ticket's schema/DAO scope.
+     *
+     * [accountId] `null` selects the device's single Guest's Sets
+     * (`workout-partner-v3` ticket 06) — `IS` rather than `=` so the same
+     * query works for both, since SQL's `= NULL` never matches.
      */
     @Query(
         """
         SELECT sets.* FROM sets
         INNER JOIN sessions ON sets.sessionId = sessions.id
-        WHERE sessions.accountId = :accountId
+        WHERE sessions.accountId IS :accountId
         ORDER BY sets.timestamp ASC
         """,
     )
-    suspend fun getForAccount(accountId: String): List<SetEntity>
+    suspend fun getForAccount(accountId: String?): List<SetEntity>
 }

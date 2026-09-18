@@ -1,7 +1,6 @@
 package com.workoutpartner.app.settings
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,38 +37,33 @@ import com.workoutpartner.data.ActivityLevel
 import com.workoutpartner.data.AuthRepository
 
 /**
- * Profile/settings entry point: who's signed in, the Account's editable
+ * Profile/settings entry point: who's signed in, the Athlete's editable
  * body-stats (`workout-partner-v2` ticket 01 — name/age/height/weight/
  * activity level, first collected at onboarding), the daily reminder
- * notification toggle (ticket 12's [com.workoutpartner.data.AccountEntity.notificationsEnabled]),
- * the Weekly Target shortcut (the same control [com.workoutpartner.app.progress.ProgressScreen]
- * already exposes — Progress is where it lives, this just points there), and
- * Sign out. A Guest sees a plain message and a Sign up prompt instead — same
- * "no Account, nothing Account-shaped to show" gating as [com.workoutpartner.app.progress.ProgressScreen].
+ * notification toggle (ticket 12's [com.workoutpartner.data.AccountEntity.notificationsEnabled]
+ * or, for a Guest, [com.workoutpartner.data.GuestProfileEntity.notificationsEnabled]),
+ * and the Weekly Target shortcut (the same control [com.workoutpartner.app.progress.ProgressScreen]
+ * already exposes — Progress is where it lives, this just points there). All
+ * of it works fully for a Guest too, since `workout-partner-v3` ticket 06
+ * (ADR-0007) — [accountId] `null` just points [SettingsViewModel] at the
+ * device's single Guest's state instead of an Account's. The one thing that
+ * differs by [accountId]: an Account holder sees "Sign out"; a Guest sees a
+ * "Back up your progress" entry (backup framing, not "unlock more
+ * features" — every feature already works without one) that surfaces
+ * Sign up/Sign in instead.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     accountId: String?,
     accountRepository: AccountRepository,
-    authRepository: AuthRepository?,
+    authRepository: AuthRepository,
     onSignedOut: () -> Unit,
     onSignUp: () -> Unit,
+    onSignIn: () -> Unit,
     onViewProgress: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (accountId == null || authRepository == null) {
-        Surface(modifier = modifier.fillMaxSize()) {
-            Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("You're using Guest mode — sign up for an Account to set a Weekly Target and daily reminders.")
-                    Button(onClick = onSignUp, modifier = Modifier.padding(top = 16.dp)) { Text("Sign up") }
-                }
-            }
-        }
-        return
-    }
-
     val viewModel: SettingsViewModel = viewModel(
         factory = remember { viewModelFactory { initializer { SettingsViewModel(accountId, accountRepository, authRepository) } } },
     )
@@ -164,7 +158,25 @@ fun SettingsScreen(
                 }
             }
             Button(onClick = onViewProgress, modifier = Modifier.fillMaxWidth()) { Text("Weekly Target & Progress") }
-            Button(onClick = { viewModel.signOut(onSignedOut) }, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
+            if (accountId != null) {
+                Button(onClick = { viewModel.signOut(onSignedOut) }, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
+            } else {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Back up your progress", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Everything here is saved on this device only. Sign up (or sign in) to keep it permanently and sync it across devices.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                        Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = onSignUp, modifier = Modifier.weight(1f)) { Text("Sign up") }
+                            Button(onClick = onSignIn, modifier = Modifier.weight(1f)) { Text("Sign in") }
+                        }
+                    }
+                }
+            }
         }
     }
 }

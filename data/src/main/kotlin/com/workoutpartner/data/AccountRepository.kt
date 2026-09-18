@@ -39,14 +39,26 @@ class AccountRepository(
         return account
     }
 
-    suspend fun updateWeeklyTarget(accountId: String, weeklyTarget: Int) {
-        val account = accountDao.getById(accountId) ?: return
-        accountDao.update(account.copy(weeklyTarget = weeklyTarget))
+    /** [accountId] `null` updates the device's single Guest's Weekly Target instead (`workout-partner-v3` ticket 06, ADR-0007) — a Guest now accumulates the same Streak state an Account does. */
+    suspend fun updateWeeklyTarget(accountId: String?, weeklyTarget: Int) {
+        if (accountId != null) {
+            val account = accountDao.getById(accountId) ?: return
+            accountDao.update(account.copy(weeklyTarget = weeklyTarget))
+        } else {
+            val guest = guestProfileDao.get() ?: GuestProfileEntity()
+            guestProfileDao.upsert(guest.copy(weeklyTarget = weeklyTarget))
+        }
     }
 
-    suspend fun updateNotificationsEnabled(accountId: String, enabled: Boolean) {
-        val account = accountDao.getById(accountId) ?: return
-        accountDao.update(account.copy(notificationsEnabled = enabled))
+    /** [accountId] `null` updates the device's single Guest's notification preference instead (`workout-partner-v3` ticket 06, ADR-0007) — a Guest can now enable the daily reminder. */
+    suspend fun updateNotificationsEnabled(accountId: String?, enabled: Boolean) {
+        if (accountId != null) {
+            val account = accountDao.getById(accountId) ?: return
+            accountDao.update(account.copy(notificationsEnabled = enabled))
+        } else {
+            val guest = guestProfileDao.get() ?: GuestProfileEntity()
+            guestProfileDao.upsert(guest.copy(notificationsEnabled = enabled))
+        }
     }
 
     /** Updates the Account's own body-stats (`workout-partner-v2` ticket 01) — collected once at onboarding, editable afterward from Settings. */
@@ -64,7 +76,17 @@ class AccountRepository(
         )
     }
 
-    /** A Guest's in-progress body-stats answers, captured before an Account exists — see [GuestProfileEntity]. */
+    /**
+     * A Guest's body-stats answers — captured before an Account exists, and,
+     * since `workout-partner-v3` ticket 06, also editable afterward from
+     * Settings the same way an Account's profile is. Reads the existing row
+     * (if any) and copies only the body-stats fields onto it, rather than
+     * `upsert`ing a fresh [GuestProfileEntity]: once a Guest has real
+     * [GuestProfileEntity.weeklyTarget]/[GuestProfileEntity.currentStreak]/
+     * [GuestProfileEntity.bankedShields]/[GuestProfileEntity.notificationsEnabled]
+     * state, blindly replacing the whole row would silently reset it to
+     * those columns' defaults.
+     */
     suspend fun saveGuestProfile(
         name: String,
         age: Int,
@@ -72,28 +94,39 @@ class AccountRepository(
         weightKg: Double,
         activityLevel: ActivityLevel,
     ) {
+        val existing = guestProfileDao.get() ?: GuestProfileEntity()
         guestProfileDao.upsert(
-            GuestProfileEntity(name = name, age = age, heightCm = heightCm, weightKg = weightKg, activityLevel = activityLevel),
+            existing.copy(name = name, age = age, heightCm = heightCm, weightKg = weightKg, activityLevel = activityLevel),
         )
     }
 
     suspend fun getGuestProfile(): GuestProfileEntity? = guestProfileDao.get()
 
     /**
-     * Recomputes [AccountEntity.currentStreak]/[AccountEntity.bankedShields]
-     * from the account's full Set history via `core-streaks.StreakCalculator`
-     * — the "keep them in sync... whenever a new Active Day lands" this
-     * schema's own doc comment (ticket 05) calls for. [zone] resolves each
-     * Set's [Instant] timestamp to the calendar day it counts as an Active
-     * Day on; [today] is the caller's injected "today," same as
-     * [StreakCalculator] itself requires (this repository doesn't read the
-     * system clock on its own).
+     * Recomputes the owner's cached `currentStreak`/`bankedShields` from
+     * their full Set history via `core-streaks.StreakCalculator` — the "keep
+     * them in sync... whenever a new Active Day lands" [AccountEntity]'s own
+     * doc comment (ticket 05) calls for. [zone] resolves each Set's [Instant]
+     * timestamp to the calendar day it counts as an Active Day on; [today]
+     * is the caller's injected "today," same as [StreakCalculator] itself
+     * requires (this repository doesn't read the system clock on its own).
+     *
+     * [accountId] `null` recomputes the device's single Guest's
+     * [GuestProfileEntity] row instead (`workout-partner-v3` ticket 06,
+     * ADR-0007) — a Guest now accumulates the same Streak/Shields state an
+     * Account does, just cached on that row rather than [AccountEntity].
      */
-    suspend fun recomputeStreak(accountId: String, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()) {
-        val account = accountDao.getById(accountId) ?: return
+    suspend fun recomputeStreak(accountId: String?, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()) {
         val activeDays = setDao.getForAccount(accountId).map { it.timestamp.atZoneToLocalDate(zone) }.toSet()
-        val status = StreakCalculator.calculate(activeDays = activeDays, today = today, weeklyTarget = account.weeklyTarget)
-        accountDao.update(account.copy(currentStreak = status.currentStreak, bankedShields = status.bankedShields))
+        if (accountId != null) {
+            val account = accountDao.getById(accountId) ?: return
+            val status = StreakCalculator.calculate(activeDays = activeDays, today = today, weeklyTarget = account.weeklyTarget)
+            accountDao.update(account.copy(currentStreak = status.currentStreak, bankedShields = status.bankedShields))
+        } else {
+            val guest = guestProfileDao.get() ?: GuestProfileEntity()
+            val status = StreakCalculator.calculate(activeDays = activeDays, today = today, weeklyTarget = guest.weeklyTarget)
+            guestProfileDao.upsert(guest.copy(currentStreak = status.currentStreak, bankedShields = status.bankedShields))
+        }
     }
 
     /** Whether this device has any Guest Session ([SessionEntity.accountId] null) still waiting to be claimed — what ticket 07's Auth module checks before triggering migration on sign-up. */
@@ -111,6 +144,21 @@ class AccountRepository(
      *
      * This is the primitive, not the migration itself — ticket 08 also
      * needs to touch Firestore/Auth, which is beyond this repository.
+     *
+     * **Known gap, left to `workout-partner-v3` ticket 05:** since ticket 06
+     * (ADR-0007) a Guest's [GuestProfileEntity.weeklyTarget]/[GuestProfileEntity.currentStreak]/
+     * [GuestProfileEntity.bankedShields]/[GuestProfileEntity.notificationsEnabled]
+     * are real, user-set state, not just unused defaults — but this method
+     * still only copies body-stats onto the new Account and discards the
+     * rest via [GuestProfileDao.clear], and the [recomputeStreak] call above
+     * recomputes against the new Account's own (default) `weeklyTarget`,
+     * not the Guest's. A Guest who set a custom target and banked a Shield
+     * under it currently loses both on sign-up. Ticket 05 owns the actual
+     * sign-up/merge contract for this widened Guest state ("claims... Guest
+     * Weekly Target; recomputes Streak/Shields from the full Set history");
+     * re-flagged here rather than silently fixed, since ticket 05 also
+     * needs to decide Merge's "Account's existing target wins" case, which
+     * a plain copy here would get wrong for that path.
      */
     suspend fun claimGuestData(accountId: String, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()) {
         database.withTransaction {

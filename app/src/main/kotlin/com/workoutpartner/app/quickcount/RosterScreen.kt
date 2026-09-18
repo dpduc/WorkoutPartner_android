@@ -28,10 +28,15 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.workoutpartner.data.RosterRepository
 import com.workoutpartner.data.TrackedProfileEntity
 
-/** The Roster (ticket 11, CONTEXT.md): create/list Tracked Profiles, tap one to start a Quick Count run against them. */
+/**
+ * The Roster (ticket 11, CONTEXT.md): create/list Tracked Profiles, tap one
+ * to start a Quick Count run against them. [accountId] `null` is a Guest's
+ * own Roster (`workout-partner-v3` ticket 06, ADR-0007) — works exactly the
+ * same as an Account holder's.
+ */
 @Composable
 fun RosterScreen(
-    accountId: String,
+    accountId: String?,
     rosterRepository: RosterRepository,
     onProfileSelected: (TrackedProfileEntity) -> Unit,
     onViewHistory: (TrackedProfileEntity) -> Unit,
