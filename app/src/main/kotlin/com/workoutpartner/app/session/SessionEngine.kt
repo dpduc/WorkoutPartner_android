@@ -30,7 +30,8 @@ data class CompletedSet(
 
 sealed interface SessionPhase {
     data class Countdown(val stepIndex: Int, val secondsRemaining: Int) : SessionPhase
-    data class Tracking(val stepIndex: Int, val repCount: Int, val trackable: Boolean) : SessionPhase
+    /** [targetReps] is the already difficulty-adjusted target — the same value [SessionEngine] itself is tracking a Good Set against, not the Routine's raw unscaled number. */
+    data class Tracking(val stepIndex: Int, val repCount: Int, val trackable: Boolean, val targetReps: Int) : SessionPhase
     data class SetSummary(val stepIndex: Int, val completedSet: CompletedSet) : SessionPhase
     data class Resting(val stepIndex: Int, val secondsRemaining: Int) : SessionPhase
     data class SessionComplete(val completedSets: List<CompletedSet>) : SessionPhase
@@ -132,7 +133,7 @@ class SessionEngine(private val steps: List<RoutineStep>) {
     private fun startTrackingCurrentStep(): SessionPhase.Tracking {
         repCounter = RepCounter.forExercise(steps[stepIndex].exercise)
         repEvents = mutableListOf()
-        return SessionPhase.Tracking(stepIndex, repCount = 0, trackable = true)
+        return SessionPhase.Tracking(stepIndex, repCount = 0, trackable = true, targetReps = steps[stepIndex].targetReps)
     }
 
     private fun advanceToNextStepOrFinish(): SessionPhase {

@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -22,7 +23,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -112,7 +115,12 @@ fun SessionScreen(
     Surface(modifier = modifier.fillMaxSize()) {
         when (val current = phase) {
             is SessionPhase.Countdown -> CountdownContent(current)
-            is SessionPhase.Tracking -> TrackingContent(current, viewModel::startCamera, onFinishSet = viewModel::finishSet)
+            is SessionPhase.Tracking -> TrackingContent(
+                current,
+                routine = routine,
+                onCameraReady = viewModel::startCamera,
+                onFinishSet = viewModel::finishSet,
+            )
             is SessionPhase.SetSummary -> SetSummaryContent(
                 current,
                 onContinue = {
@@ -137,14 +145,30 @@ private fun CountdownContent(phase: SessionPhase.Countdown, modifier: Modifier =
     }
 }
 
+/**
+ * The live rep-tracking layout (`workout-partner-v3` ticket 04): sized for
+ * an Athlete standing ~2m from the phone, per the phone-down/camera-at-a-
+ * distance setup Before You Start's Position Check (ticket 12) will confirm
+ * — huge rep count, large Exercise (or Exercise Variant, once ticket 08
+ * adds one) name, a wide progress bar toward the rep target, smaller
+ * secondary info (the Set's position in the Routine). [SessionPhase.Tracking.targetReps]
+ * is already the difficulty-adjusted value [SessionEngine] itself is
+ * tracking toward — read from the engine's own phase rather than
+ * recomputed here, so this layout can never drift from what a Good Set
+ * actually requires.
+ */
 @Composable
 private fun TrackingContent(
     phase: SessionPhase.Tracking,
+    routine: RoutineWithSteps,
     onCameraReady: (androidx.lifecycle.LifecycleOwner, Preview.SurfaceProvider) -> Unit,
     onFinishSet: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    val step = routine.steps[phase.stepIndex]
+    val progress = (phase.repCount.toFloat() / phase.targetReps.coerceAtLeast(1)).coerceIn(0f, 1f)
+
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
@@ -167,8 +191,27 @@ private fun TrackingContent(
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Text(text = phase.repCount.toString(), style = MaterialTheme.typography.displayLarge)
-                Button(onClick = onFinishSet) { Text("Finish Set") }
+                Text(
+                    text = "Set ${phase.stepIndex + 1} of ${routine.steps.size}",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 28.sp),
+                )
+                Text(
+                    text = step.exercise.name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase),
+                    style = MaterialTheme.typography.headlineLarge.copy(fontSize = 48.sp, fontWeight = FontWeight.Bold),
+                )
+                Text(
+                    text = phase.repCount.toString(),
+                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 120.sp, fontWeight = FontWeight.Bold),
+                )
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                )
+                Text(
+                    text = "${phase.targetReps} reps",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 28.sp),
+                )
+                Button(onClick = onFinishSet, modifier = Modifier.padding(top = 12.dp)) { Text("Finish Set") }
             }
         }
     }

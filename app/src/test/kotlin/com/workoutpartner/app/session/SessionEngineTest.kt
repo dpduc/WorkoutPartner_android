@@ -35,7 +35,7 @@ class SessionEngineTest {
         assertEquals(SessionPhase.Countdown(stepIndex = 0, secondsRemaining = 1), engine.phase)
 
         engine.onTick()
-        assertEquals(SessionPhase.Tracking(stepIndex = 0, repCount = 0, trackable = true), engine.phase)
+        assertEquals(SessionPhase.Tracking(stepIndex = 0, repCount = 0, trackable = true, targetReps = 10), engine.phase)
     }
 
     @Test
@@ -46,7 +46,7 @@ class SessionEngineTest {
         engine.onPoseSignal(PoseTrackingSignal.Trackable(deepSquatFrame))
         engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
 
-        assertEquals(SessionPhase.Tracking(stepIndex = 0, repCount = 1, trackable = true), engine.phase)
+        assertEquals(SessionPhase.Tracking(stepIndex = 0, repCount = 1, trackable = true, targetReps = 10), engine.phase)
     }
 
     @Test
@@ -56,13 +56,13 @@ class SessionEngineTest {
         engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
         engine.onPoseSignal(PoseTrackingSignal.Trackable(deepSquatFrame))
         engine.onPoseSignal(PoseTrackingSignal.Lost)
-        assertEquals(SessionPhase.Tracking(stepIndex = 0, repCount = 0, trackable = false), engine.phase)
+        assertEquals(SessionPhase.Tracking(stepIndex = 0, repCount = 0, trackable = false, targetReps = 10), engine.phase)
 
         // Resumes on the same RepCounter — the rep completes normally once
         // tracking comes back, no restart needed.
         engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
 
-        assertEquals(SessionPhase.Tracking(stepIndex = 0, repCount = 1, trackable = true), engine.phase)
+        assertEquals(SessionPhase.Tracking(stepIndex = 0, repCount = 1, trackable = true, targetReps = 10), engine.phase)
     }
 
     @Test
