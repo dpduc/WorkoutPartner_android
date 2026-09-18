@@ -1,13 +1,17 @@
 package com.workoutpartner.data
 
 /**
- * An Account's self-reported daily activity level (CONTEXT.md), a 3-tier
- * scale collected during onboarding (`workout-partner-v2` ticket 01) and
- * consumed by `app`'s routine-difficulty tuning alongside body-mass/age
- * (ticket 02).
+ * An Account's (or Guest's) self-reported daily activity level (CONTEXT.md),
+ * a 4-tier scale collected during onboarding and consumed by `app`'s
+ * routine-difficulty tuning alongside body-mass/age. `workout-partner-v3`
+ * ticket 02 replaced the original 3-tier LOW/MEDIUM/HIGH scale with these
+ * four friendlier tiers; existing stored answers are remapped by
+ * `MIGRATION_4_5` (LOW->SEDENTARY, MEDIUM->LIGHTLY_ACTIVE, HIGH->ACTIVE) —
+ * see that migration's doc comment for why those particular pairings.
  */
 enum class ActivityLevel {
-    LOW,
-    MEDIUM,
-    HIGH,
+    SEDENTARY,
+    LIGHTLY_ACTIVE,
+    ACTIVE,
+    VERY_ACTIVE,
 }

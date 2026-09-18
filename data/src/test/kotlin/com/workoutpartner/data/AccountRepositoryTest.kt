@@ -64,7 +64,7 @@ class AccountRepositoryTest {
     @Test
     fun `claimGuestData also copies a saved GuestProfile onto the new Account and clears it`() = runTest {
         accountRepository.saveGuestProfile(
-            name = "Alex", age = 29, heightCm = 175, weightKg = 70.0, activityLevel = ActivityLevel.MEDIUM,
+            name = "Alex", age = 29, heightCm = 175, weightKg = 70.0, activityLevel = ActivityLevel.LIGHTLY_ACTIVE,
         )
         val account = accountRepository.createAccount("account-1")
 
@@ -75,7 +75,7 @@ class AccountRepositoryTest {
         assertEquals(29, migrated.age)
         assertEquals(175, migrated.heightCm)
         assertEquals(70.0, migrated.weightKg)
-        assertEquals(ActivityLevel.MEDIUM, migrated.activityLevel)
+        assertEquals(ActivityLevel.LIGHTLY_ACTIVE, migrated.activityLevel)
         assertNull(accountRepository.getGuestProfile())
     }
 
@@ -95,7 +95,7 @@ class AccountRepositoryTest {
         val account = accountRepository.createAccount("account-1")
 
         accountRepository.updateProfile(
-            account.id, name = "Sam", age = 41, heightCm = 180, weightKg = 82.5, activityLevel = ActivityLevel.HIGH,
+            account.id, name = "Sam", age = 41, heightCm = 180, weightKg = 82.5, activityLevel = ActivityLevel.ACTIVE,
         )
 
         val updated = accountRepository.getAccount(account.id)!!
@@ -103,7 +103,7 @@ class AccountRepositoryTest {
         assertEquals(41, updated.age)
         assertEquals(180, updated.heightCm)
         assertEquals(82.5, updated.weightKg)
-        assertEquals(ActivityLevel.HIGH, updated.activityLevel)
+        assertEquals(ActivityLevel.ACTIVE, updated.activityLevel)
     }
 
     private suspend fun recordOn(sessionId: String, isoTimestamp: String) {

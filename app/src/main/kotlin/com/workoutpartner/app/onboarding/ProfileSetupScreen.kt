@@ -30,10 +30,14 @@ import kotlinx.coroutines.launch
 
 /**
  * Collects the body-stats every user answers once — name, age, height,
- * weight, and a 3-tier daily [ActivityLevel] — right after choosing Guest
- * or completing Sign up (`workout-partner-v2` ticket 01). An existing
- * Account signing back in already has these from its own prior sign-up, so
+ * weight, and a daily [ActivityLevel] — right after choosing Guest or
+ * completing Sign up (`workout-partner-v2` ticket 01). An existing Account
+ * signing back in already has these from its own prior sign-up, so
  * `MainActivity` never routes `AppScreen.SignIn` through this screen.
+ *
+ * The segmented-button control below is a placeholder: `workout-partner-v3`
+ * ticket 07 replaces it with four illustrated cards. This screen only needed
+ * to keep compiling once ticket 02 widened [ActivityLevel] to four tiers.
  *
  * [onSubmit] is where the caller decides where the answers land: a Guest's
  * go to `AccountRepository.saveGuestProfile` (claimed onto a real Account
@@ -51,7 +55,7 @@ fun ProfileSetupScreen(
     var ageInput by remember { mutableStateOf("") }
     var heightInput by remember { mutableStateOf("") }
     var weightInput by remember { mutableStateOf("") }
-    var activityLevel by remember { mutableStateOf(ActivityLevel.MEDIUM) }
+    var activityLevel by remember { mutableStateOf(ActivityLevel.LIGHTLY_ACTIVE) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSubmitting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -141,7 +145,8 @@ fun ProfileSetupScreen(
 }
 
 private fun ActivityLevel.displayLabel(): String = when (this) {
-    ActivityLevel.LOW -> "Low"
-    ActivityLevel.MEDIUM -> "Medium"
-    ActivityLevel.HIGH -> "High"
+    ActivityLevel.SEDENTARY -> "Sedentary"
+    ActivityLevel.LIGHTLY_ACTIVE -> "Lightly Active"
+    ActivityLevel.ACTIVE -> "Active"
+    ActivityLevel.VERY_ACTIVE -> "Very Active"
 }

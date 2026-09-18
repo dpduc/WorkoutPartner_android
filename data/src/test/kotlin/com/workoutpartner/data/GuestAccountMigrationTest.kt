@@ -114,7 +114,7 @@ class GuestAccountMigrationTest {
     @Test
     fun `signing up as a Guest with a saved GuestProfile claims it onto the new Account`() = runTest {
         accountRepository.saveGuestProfile(
-            name = "Alex", age = 29, heightCm = 175, weightKg = 70.0, activityLevel = ActivityLevel.MEDIUM,
+            name = "Alex", age = 29, heightCm = 175, weightKg = 70.0, activityLevel = ActivityLevel.LIGHTLY_ACTIVE,
         )
         val routineId = seedRoutine()
         val guestSession = setRepository.startSession(accountId = null, routineId = routineId, timestamp = Instant.parse("2024-01-01T10:00:00Z"))
@@ -124,7 +124,7 @@ class GuestAccountMigrationTest {
 
         val account = accountRepository.getAccount(accountId)!!
         assertEquals("Alex", account.name)
-        assertEquals(ActivityLevel.MEDIUM, account.activityLevel)
+        assertEquals(ActivityLevel.LIGHTLY_ACTIVE, account.activityLevel)
         assertNull(accountRepository.getGuestProfile())
     }
 

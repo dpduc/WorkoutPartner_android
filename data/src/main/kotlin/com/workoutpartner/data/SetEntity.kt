@@ -23,6 +23,14 @@ import java.time.Instant
  *
  * Cascade-deletes with its Session: a Set has no existence apart from the
  * Session it was performed in.
+ *
+ * [exerciseVariant] (`workout-partner-v3` ticket 02) is null for [exercise]'s
+ * standard form, or the variant's raw name (e.g. `"STEP_JACK"`) when the
+ * Athlete performed an Exercise Variant instead — see CONTEXT.md's Exercise
+ * Variant entry. Deliberately a raw String, not yet a real `ExerciseVariant`
+ * enum type: this ticket only makes room for the column; ticket 08 defines
+ * that type in `core-rep-counting` and can narrow this field to it without
+ * a further migration, since both serialize to the same TEXT column.
  */
 @Entity(
     tableName = "sets",
@@ -45,4 +53,5 @@ data class SetEntity(
     val formScore: Int,
     val goodSet: Boolean,
     val timestamp: Instant,
+    val exerciseVariant: String? = null,
 )

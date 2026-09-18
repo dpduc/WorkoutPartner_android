@@ -23,6 +23,10 @@ import java.time.Instant
  *
  * Cascade-deletes with its Tracked Profile: a Tally has no existence apart
  * from the profile it was recorded against.
+ *
+ * [exerciseVariant] (`workout-partner-v3` ticket 02): see [SetEntity]'s doc
+ * comment on the field of the same name — same reasoning, same raw-String
+ * placeholder type pending ticket 08's real `ExerciseVariant` type.
  */
 @Entity(
     tableName = "tallies",
@@ -45,4 +49,5 @@ data class TallyEntity(
     val timestamp: Instant,
     val formScore: Int? = null,
     val durationSeconds: Int? = null,
+    val exerciseVariant: String? = null,
 )

@@ -202,7 +202,7 @@ The Room/SQLite schema is already structured to support this strategy:
 | `accounts` | `id` (Text) | None | N/A (Primary identity) |
 | `sessions` | `id` (UUID) | `accountId` &rarr; `accounts.id` | **Yes** (NULL for Guest, set on migration) |
 | `sets` | `id` (UUID) | `sessionId` &rarr; `sessions.id` | N/A (Inherits ownership via Session) |
-| `tracked_profiles` | `id` (UUID) | `accountId` &rarr; `accounts.id` | No (Quick Count is Account-only) |
+| `tracked_profiles` | `id` (UUID) | `accountId` &rarr; `accounts.id` | **Yes** (NULL for a Guest's own Roster, `workout-partner-v3` ticket 02) |
 | `tallies` | `id` (UUID) | `trackedProfileId` &rarr; `tracked_profiles.id` | N/A (Inherits ownership via Profile) |
 | `pending_sync` | `queueId` (Long) | None (Outbox queue) | N/A |
 | `guest_profile` | `id` (Int, fixed single row) | None | N/A (pre-Account, device-local only) |
@@ -224,6 +224,26 @@ this without any new tables besides `guest_profile`:
   Tallies never have a Form Score"; see `CONTEXT.md`'s Form Score/Tally
   entries and `firestore.rules`' `tallies` match block, both updated
   alongside this.
+
+`workout-partner-v3` (ticket 02, schema version 4 &rarr; 5) is a pure schema
+foundation for the Guest-parity/Activity-Level/Step-Jack work that follows —
+no new tables, no app behavior changes:
+- `ActivityLevel` becomes a 4-tier scale (`SEDENTARY`/`LIGHTLY_ACTIVE`/
+  `ACTIVE`/`VERY_ACTIVE`, replacing `LOW`/`MEDIUM`/`HIGH`); existing
+  `accounts`/`guest_profile` rows are remapped LOW&rarr;SEDENTARY,
+  MEDIUM&rarr;LIGHTLY_ACTIVE, HIGH&rarr;ACTIVE (the conservative direction —
+  see `MIGRATION_4_5`'s doc comment).
+- `tracked_profiles.accountId` becomes nullable (table row above) — a Guest
+  can now own a Roster too (ticket 06 is what actually lets them).
+- `guest_profile` gains `weeklyTarget` (Int), `currentStreak` (Int),
+  `bankedShields` (Int), `notificationsEnabled` (Bool) — the same
+  Streak/Weekly-Target/Shields/notification state an Account carries,
+  same defaults — and its five body-stats columns become nullable, since a
+  Guest can now have Streak state before (or without) answering onboarding.
+- `sets` and `tallies` each gain a nullable `exerciseVariant` (Text) column
+  — null for an Exercise's standard form, the variant's name (e.g.
+  `"STEP_JACK"`) otherwise. Deliberately typed as a raw column for now;
+  ticket 08 defines the real `ExerciseVariant` type in `core-rep-counting`.
 
 ---
 

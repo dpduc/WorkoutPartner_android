@@ -27,6 +27,7 @@ as `SetEntity.id` (Room). Immutable once written — never updated or deleted.
 | `formScore` | int | 0-100. |
 | `goodSet` | bool | Both conditions per CONTEXT.md's Good Set definition. |
 | `timestamp` | timestamp | |
+| `exerciseVariant` | string or null | `workout-partner-v3` ticket 02: null for `exercise`'s standard form, the Exercise Variant's name (e.g. `"STEP_JACK"`) otherwise. Schema/rules only for now — `SetEntity.toFirestoreMap()` doesn't populate this yet; that's ticket 08's job once Step Jack Sets actually exist. |
 
 ## `tallies/{tallyId}`
 
@@ -42,6 +43,7 @@ Immutable once written. Never carries a Form Score.
 | `repsAchieved` | int | |
 | `target` | int or null | Optional (spec.md story 36). |
 | `timestamp` | timestamp | |
+| `exerciseVariant` | string or null | `workout-partner-v3` ticket 02 — same meaning and same "schema/rules only for now" caveat as `sets.exerciseVariant` above. |
 
 **Not yet implemented — schema defined ahead of the write path, a disclosed
 gap in `SyncEngine`'s own doc comment ("Account/Session/Roster documents

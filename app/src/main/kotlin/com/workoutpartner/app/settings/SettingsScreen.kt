@@ -79,7 +79,7 @@ fun SettingsScreen(
     var ageInput by remember { mutableStateOf("") }
     var heightInput by remember { mutableStateOf("") }
     var weightInput by remember { mutableStateOf("") }
-    var activityLevel by remember { mutableStateOf(ActivityLevel.MEDIUM) }
+    var activityLevel by remember { mutableStateOf(ActivityLevel.LIGHTLY_ACTIVE) }
 
     // Seeds the editable fields from the Account's real row exactly once,
     // when it finishes loading (state.isLoaded flips false -> true) —
@@ -90,7 +90,7 @@ fun SettingsScreen(
             ageInput = state.age?.toString() ?: ""
             heightInput = state.heightCm?.toString() ?: ""
             weightInput = state.weightKg?.toString() ?: ""
-            activityLevel = state.activityLevel ?: ActivityLevel.MEDIUM
+            activityLevel = state.activityLevel ?: ActivityLevel.LIGHTLY_ACTIVE
         }
     }
 
@@ -134,7 +134,7 @@ fun SettingsScreen(
                                 onClick = { activityLevel = level },
                                 shape = SegmentedButtonDefaults.itemShape(index = index, count = ActivityLevel.entries.size),
                             ) {
-                                Text(level.name.lowercase().replaceFirstChar(Char::uppercase))
+                                Text(level.name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase))
                             }
                         }
                     }

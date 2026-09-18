@@ -53,11 +53,16 @@ service cloud.firestore {
     // SetEntity.toFirestoreMap()). Immutable, append-only per SyncEngine's
     // doc comment: no update/delete path for anyone, Android included —
     // "editing" a Set isn't a feature this app has.
+    //
+    // exerciseVariant (workout-partner-v3 ticket 02) is accepted here ahead
+    // of SetEntity.toFirestoreMap() actually populating it (ticket 08's
+    // job) — schema/rules only for now, same as the doc comment on
+    // SetEntity.exerciseVariant itself.
     match /sets/{setId} {
       allow read: if ownsAccount(resource.data.accountId);
       allow create: if ownsAccount(request.resource.data.accountId)
         && request.resource.data.keys().hasOnly(
-             ['id', 'accountId', 'sessionId', 'exercise', 'targetReps', 'actualReps', 'formScore', 'goodSet', 'timestamp']
+             ['id', 'accountId', 'sessionId', 'exercise', 'targetReps', 'actualReps', 'formScore', 'goodSet', 'timestamp', 'exerciseVariant']
            )
         && request.resource.data.id is string
         && request.resource.data.sessionId is string
@@ -66,7 +71,8 @@ service cloud.firestore {
         && request.resource.data.actualReps is int
         && request.resource.data.formScore is int
         && request.resource.data.goodSet is bool
-        && request.resource.data.timestamp is timestamp;
+        && request.resource.data.timestamp is timestamp
+        && (!('exerciseVariant' in request.resource.data) || request.resource.data.exerciseVariant == null || request.resource.data.exerciseVariant is string);
       allow update, delete: if false;
     }
 
@@ -75,12 +81,14 @@ service cloud.firestore {
     // formScore/durationSeconds (workout-partner-v2 ticket 03, reversing
     // the earlier "Quick Count Tallies never have a Form Score" decision)
     // are nullable in the same shape `target` already was, for a Tally
-    // recorded before that ticket landed.
+    // recorded before that ticket landed. exerciseVariant (workout-partner-v3
+    // ticket 02) is accepted ahead of the write path the same way as
+    // sets.exerciseVariant above.
     match /tallies/{tallyId} {
       allow read: if ownsAccount(resource.data.accountId);
       allow create: if ownsAccount(request.resource.data.accountId)
         && request.resource.data.keys().hasOnly(
-             ['id', 'accountId', 'trackedProfileId', 'exercise', 'repsAchieved', 'target', 'timestamp', 'formScore', 'durationSeconds']
+             ['id', 'accountId', 'trackedProfileId', 'exercise', 'repsAchieved', 'target', 'timestamp', 'formScore', 'durationSeconds', 'exerciseVariant']
            )
         && request.resource.data.id is string
         && request.resource.data.trackedProfileId is string
@@ -89,7 +97,8 @@ service cloud.firestore {
         && (request.resource.data.target == null || request.resource.data.target is int)
         && request.resource.data.timestamp is timestamp
         && (request.resource.data.formScore == null || request.resource.data.formScore is int)
-        && (request.resource.data.durationSeconds == null || request.resource.data.durationSeconds is int);
+        && (request.resource.data.durationSeconds == null || request.resource.data.durationSeconds is int)
+        && (!('exerciseVariant' in request.resource.data) || request.resource.data.exerciseVariant == null || request.resource.data.exerciseVariant is string);
       allow update, delete: if false;
     }
 
