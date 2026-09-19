@@ -32,6 +32,7 @@ import androidx.credentials.GetCredentialRequest
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.workoutpartner.data.AuthRepository
+import com.workoutpartner.data.SignInResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -46,7 +47,14 @@ fun SignUpScreen(authRepository: AuthRepository, onSignedUp: (accountId: String)
         submitLabel = "Create Account",
         authRepository = authRepository,
         onCancel = onCancel,
-        onSubmitEmail = { email, password -> authRepository.signUp(email, password) },
+        // signUp always claims Guest data unconditionally (AuthRepository's
+        // own doc comment) — never a SignInResult.GuestDataPending — but
+        // wrapped in SignedIn anyway so AuthForm has one result shape to
+        // handle regardless of which of its two callers is submitting.
+        // "Continue with Google" further down (shared by both screens) is a
+        // genuine sign-in either way, since Firebase doesn't distinguish
+        // "sign up" from "sign in" for an existing Google identity.
+        onSubmitEmail = { email, password -> SignInResult.SignedIn(authRepository.signUp(email, password)) },
         onSuccess = onSignedUp,
     )
 }
@@ -58,25 +66,40 @@ fun SignInScreen(authRepository: AuthRepository, onSignedIn: (accountId: String)
         submitLabel = "Sign in",
         authRepository = authRepository,
         onCancel = onCancel,
-        // The SignInResult.GuestDataPending case isn't acted on here yet —
-        // ticket 05 is data-layer only; the real merge/discard prompt is
-        // ticket 09's. For now this behaves exactly as it did before:
-        // sign in succeeds, any pending Guest data just stays pending.
-        onSubmitEmail = { email, password -> authRepository.signIn(email, password).accountId },
+        onSubmitEmail = { email, password -> authRepository.signIn(email, password) },
         onSuccess = onSignedIn,
     )
 }
 
+/**
+ * [onSubmitEmail] returns a [SignInResult] rather than a bare accountId so
+ * this shared form can react to [SignInResult.GuestDataPending] the same
+ * way regardless of caller — via [GuestDataPromptDialog] (`workout-partner-v3`
+ * ticket 09) — rather than each screen needing its own copy of that
+ * handling. [onSuccess] only ever fires with a final, resolved accountId:
+ * immediately for [SignInResult.SignedIn], or once the prompt resolves
+ * (Merge/Discard) for [SignInResult.GuestDataPending]. Backing out of the
+ * prompt calls [onCancel] instead, the same callback the plain "Cancel"
+ * button below does.
+ */
 @Composable
 private fun AuthForm(
     title: String,
     submitLabel: String,
     authRepository: AuthRepository,
-    onSubmitEmail: suspend (email: String, password: String) -> String,
+    onSubmitEmail: suspend (email: String, password: String) -> SignInResult,
     onSuccess: (accountId: String) -> Unit,
     onCancel: () -> Unit,
 ) {
     var generalError by remember { mutableStateOf<String?>(null) }
+    var pendingGuestData by remember { mutableStateOf<SignInResult.GuestDataPending?>(null) }
+
+    fun handleResult(result: SignInResult) {
+        when (result) {
+            is SignInResult.SignedIn -> onSuccess(result.accountId)
+            is SignInResult.GuestDataPending -> pendingGuestData = result
+        }
+    }
 
     Surface(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
@@ -85,7 +108,7 @@ private fun AuthForm(
             EmailAuthFields(
                 submitLabel = submitLabel,
                 onSubmit = onSubmitEmail,
-                onSuccess = onSuccess,
+                onSuccess = ::handleResult,
             )
 
             Row(
@@ -99,7 +122,7 @@ private fun AuthForm(
 
             GoogleSignInButton(
                 authRepository = authRepository,
-                onSuccess = onSuccess,
+                onSuccess = ::handleResult,
                 onError = { generalError = it },
             )
 
@@ -112,13 +135,22 @@ private fun AuthForm(
             }
         }
     }
+
+    pendingGuestData?.let { pending ->
+        GuestDataPromptDialog(
+            pending = pending,
+            authRepository = authRepository,
+            onResolved = { accountId -> pendingGuestData = null; onSuccess(accountId) },
+            onCancelled = { pendingGuestData = null; onCancel() },
+        )
+    }
 }
 
 @Composable
 private fun EmailAuthFields(
     submitLabel: String,
-    onSubmit: suspend (email: String, password: String) -> String,
-    onSuccess: (accountId: String) -> Unit,
+    onSubmit: suspend (email: String, password: String) -> SignInResult,
+    onSuccess: (SignInResult) -> Unit,
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -148,8 +180,7 @@ private fun EmailAuthFields(
                 isSubmitting = true
                 scope.launch {
                     try {
-                        val accountId = onSubmit(email.trim(), password)
-                        onSuccess(accountId)
+                        onSuccess(onSubmit(email.trim(), password))
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -170,7 +201,7 @@ private fun EmailAuthFields(
 @Composable
 private fun GoogleSignInButton(
     authRepository: AuthRepository,
-    onSuccess: (accountId: String) -> Unit,
+    onSuccess: (SignInResult) -> Unit,
     onError: (String) -> Unit,
 ) {
     val context = LocalContext.current
@@ -201,13 +232,10 @@ private fun GoogleSignInButton(
                         .addCredentialOption(googleIdOption)
                         .build()
 
-                    val result = credentialManager.getCredential(context = context, request = request)
-                    val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(result.credential.data)
+                    val credentialResult = credentialManager.getCredential(context = context, request = request)
+                    val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credentialResult.credential.data)
                     val idToken = googleIdTokenCredential.idToken
-                    // Same "pending Guest data isn't acted on yet" deferral
-                    // as SignInScreen's email path above — ticket 09's job.
-                    val accountId = authRepository.signInWithGoogle(idToken).accountId
-                    onSuccess(accountId)
+                    onSuccess(authRepository.signInWithGoogle(idToken))
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
