@@ -5,6 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.workoutpartner.core.repcounting.Exercise
+import com.workoutpartner.core.repcounting.ExerciseVariant
 import java.time.Instant
 
 /**
@@ -24,9 +25,11 @@ import java.time.Instant
  * Cascade-deletes with its Tracked Profile: a Tally has no existence apart
  * from the profile it was recorded against.
  *
- * [exerciseVariant] (`workout-partner-v3` ticket 02): see [SetEntity]'s doc
- * comment on the field of the same name — same reasoning, same raw-String
- * placeholder type pending ticket 08's real `ExerciseVariant` type.
+ * [exerciseVariant] (`workout-partner-v3` ticket 02, typed as
+ * [ExerciseVariant] since ticket 08): see [SetEntity]'s doc comment on the
+ * field of the same name — same reasoning. Not yet written by any caller
+ * (Quick Count has no Step Jack entry point — that's a later ticket, if
+ * ever built), but ready for one.
  */
 @Entity(
     tableName = "tallies",
@@ -49,5 +52,5 @@ data class TallyEntity(
     val timestamp: Instant,
     val formScore: Int? = null,
     val durationSeconds: Int? = null,
-    val exerciseVariant: String? = null,
+    val exerciseVariant: ExerciseVariant? = null,
 )

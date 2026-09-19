@@ -39,6 +39,9 @@ import java.time.temporal.ChronoUnit
 /** "SIT_UP" -> "sit up" — shared by every place this screen shows an Exercise's name. */
 private fun Exercise.displayName(): String = name.lowercase().replace('_', ' ')
 
+/** A [TrackedExercise]'s Exercise Variant name (`workout-partner-v3` ticket 08) if it has one, otherwise its Exercise's — CONTEXT.md: "scored and ranked separately from its parent Exercise." */
+private fun TrackedExercise.displayName(): String = variant?.name?.lowercase()?.replace('_', ' ') ?: exercise.displayName()
+
 /** How many weeks of Active Days the heatmap shows — not spec'd precisely ("a calendar heatmap"), a reasonable default. */
 private const val HEATMAP_WEEKS = 12
 
@@ -66,7 +69,11 @@ fun ProgressScreen(
             item { StreakCard(state.currentStreak, state.bankedShields, state.weeklyTarget, onWeeklyTargetChange = viewModel::updateWeeklyTarget) }
             item { ActiveDayHeatmap(state.today, state.activeDays) }
             item { PersonalBestsSection(state.personalBests) }
-            items(state.personalBests.keys.toList()) { exercise ->
+            // formScoreTrend is still keyed by Exercise alone (ticket 08 only
+            // asked personalBests to split by Variant) — distinct() so an
+            // Exercise with both a standard and a Variant Personal Best
+            // doesn't render the same combined trend section twice.
+            items(state.personalBests.keys.map { it.exercise }.distinct()) { exercise ->
                 FormScoreTrendSection(exercise, viewModel.formScoreTrend(exercise))
             }
         }
@@ -129,16 +136,16 @@ private fun ActiveDayHeatmap(today: LocalDate, activeDays: Set<LocalDate>, modif
 }
 
 @Composable
-private fun PersonalBestsSection(personalBests: Map<Exercise, PersonalBest>, modifier: Modifier = Modifier) {
+private fun PersonalBestsSection(personalBests: Map<TrackedExercise, PersonalBest>, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         Text("Personal Bests", style = MaterialTheme.typography.titleMedium)
         if (personalBests.isEmpty()) {
             Text("Complete a Set to start tracking Personal Bests.", modifier = Modifier.padding(top = 8.dp))
         }
-        personalBests.forEach { (exercise, best) ->
+        personalBests.forEach { (tracked, best) ->
             Card(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text(exercise.displayName(), style = MaterialTheme.typography.bodyLarge)
+                    Text(tracked.displayName(), style = MaterialTheme.typography.bodyLarge)
                     Text("Best reps: ${best.bestReps} — Best Form Score: ${best.bestFormScore}")
                 }
             }

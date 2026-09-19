@@ -2,6 +2,7 @@ package com.workoutpartner.app.session
 
 import com.workoutpartner.core.posetracking.PoseTrackingSignal
 import com.workoutpartner.core.repcounting.Exercise
+import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.core.repcounting.FormScore
 import com.workoutpartner.core.repcounting.RepCounter
 import com.workoutpartner.core.repcounting.RepEvent
@@ -11,14 +12,21 @@ import com.workoutpartner.core.repcounting.RepEvent
  * `data`'s `RoutineStepEntity` directly — the same "no persistence
  * dependency in the pure engine" seam boundary core-rep-counting/
  * core-streaks use. [SessionViewModel] maps `RoutineStepEntity` onto this.
+ *
+ * [variant] (`workout-partner-v3` ticket 08) picks an [ExerciseVariant] of
+ * [exercise] instead of its standard form — null by default, since no
+ * Routine content or UI produces one yet (that's ticket 11's job; this
+ * ticket only wires the engine so a caller that does pass one works end to
+ * end).
  */
 data class RoutineStep(
     val exercise: Exercise,
     val targetReps: Int,
     val restIntervalSeconds: Int,
+    val variant: ExerciseVariant? = null,
 )
 
-/** A completed Set — reps vs. target, Form Score, a form note (spec.md story 20: "a form note, so that I know what to improve"), and Good Set (CONTEXT.md: both conditions required). */
+/** A completed Set — reps vs. target, Form Score, a form note (spec.md story 20: "a form note, so that I know what to improve"), and Good Set (CONTEXT.md: both conditions required). [variant] mirrors the [RoutineStep] it completed. */
 data class CompletedSet(
     val exercise: Exercise,
     val targetReps: Int,
@@ -26,6 +34,7 @@ data class CompletedSet(
     val formScore: Int,
     val formNote: String,
     val goodSet: Boolean,
+    val variant: ExerciseVariant? = null,
 )
 
 sealed interface SessionPhase {
@@ -58,6 +67,14 @@ sealed interface SessionPhase {
  * [RepCounter] instance keeps running across a [PoseTrackingSignal.Lost] ->
  * [PoseTrackingSignal.Trackable] transition — auto-resume without
  * restarting the Set, per ticket 03's design.
+ *
+ * A step's [RoutineStep.variant] (`workout-partner-v3` ticket 08) flows into
+ * both the [RepCounter] built for it and the resulting [CompletedSet] —
+ * [finishSet]'s Good Set/Form Score judgement is only ever the *aggregate*
+ * of each Rep's [RepEvent.passedFormThreshold] against the uniform
+ * [GOOD_SET_FORM_SCORE_THRESHOLD], but each Rep's own pass/fail already
+ * came from the Variant's own angle thresholds if it has one — see
+ * [com.workoutpartner.core.repcounting.ExerciseProfiles].
  */
 class SessionEngine(private val steps: List<RoutineStep>) {
     init {
@@ -65,7 +82,7 @@ class SessionEngine(private val steps: List<RoutineStep>) {
     }
 
     private var stepIndex = 0
-    private var repCounter = RepCounter.forExercise(steps[0].exercise)
+    private var repCounter = RepCounter.forExercise(steps[0].exercise, steps[0].variant)
     private var repEvents = mutableListOf<RepEvent>()
 
     var phase: SessionPhase = SessionPhase.Countdown(stepIndex = 0, secondsRemaining = COUNTDOWN_SECONDS)
@@ -110,6 +127,7 @@ class SessionEngine(private val steps: List<RoutineStep>) {
             formScore = formScore,
             formNote = formNoteFor(formScore, repEvents.size, step.targetReps),
             goodSet = repEvents.size >= step.targetReps && formScore >= GOOD_SET_FORM_SCORE_THRESHOLD,
+            variant = step.variant,
         )
         completedSets.add(completed)
         phase = SessionPhase.SetSummary(stepIndex, completed)
@@ -131,7 +149,7 @@ class SessionEngine(private val steps: List<RoutineStep>) {
     private val completedSets = mutableListOf<CompletedSet>()
 
     private fun startTrackingCurrentStep(): SessionPhase.Tracking {
-        repCounter = RepCounter.forExercise(steps[stepIndex].exercise)
+        repCounter = RepCounter.forExercise(steps[stepIndex].exercise, steps[stepIndex].variant)
         repEvents = mutableListOf()
         return SessionPhase.Tracking(stepIndex, repCount = 0, trackable = true, targetReps = steps[stepIndex].targetReps)
     }

@@ -2,6 +2,7 @@ package com.workoutpartner.data
 
 import androidx.room.withTransaction
 import com.workoutpartner.core.repcounting.Exercise
+import com.workoutpartner.core.repcounting.ExerciseVariant
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -54,6 +55,7 @@ class SetRepository(
         timestamp: Instant,
         today: LocalDate,
         zone: ZoneId = ZoneId.systemDefault(),
+        exerciseVariant: ExerciseVariant? = null,
     ): SetEntity {
         val set = SetEntity(
             id = idGenerator(),
@@ -64,6 +66,7 @@ class SetRepository(
             formScore = formScore,
             goodSet = goodSet,
             timestamp = timestamp,
+            exerciseVariant = exerciseVariant,
         )
 
         database.withTransaction {

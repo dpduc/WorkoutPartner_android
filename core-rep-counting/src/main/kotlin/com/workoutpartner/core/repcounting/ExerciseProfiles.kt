@@ -8,7 +8,7 @@ package com.workoutpartner.core.repcounting
  * pick a rep-detection depth and a stricter good-form depth within that.
  */
 object ExerciseProfiles {
-    private val all: Map<Exercise, ExerciseProfile> = listOf(
+    private val all: Map<Pair<Exercise, ExerciseVariant?>, ExerciseProfile> = listOf(
         ExerciseProfile(
             exercise = Exercise.SQUAT,
             // Knee angle: hip-knee-ankle.
@@ -65,7 +65,32 @@ object ExerciseProfiles {
             repThresholdDegrees = 90f,
             formThresholdDegrees = 150f, // roughly arms-fully-overhead depth
         ),
-    ).associateBy { it.exercise }
+        ExerciseProfile(
+            exercise = Exercise.JUMPING_JACK,
+            variant = ExerciseVariant.STEP_JACK,
+            // Same elbow-shoulder-hip angle and INCREASING direction as
+            // Jumping Jack (ticket 08) — Step Jack steps out to the side
+            // instead of jumping, so it never needs the arms as wide: both
+            // thresholds are shallower than Jumping Jack's.
+            jointA = Landmark.ELBOW,
+            vertex = Landmark.SHOULDER,
+            jointC = Landmark.HIP,
+            direction = RepDirection.INCREASING,
+            repThresholdDegrees = 75f,
+            formThresholdDegrees = 135f,
+        ),
+    ).associateBy { it.exercise to it.variant }
 
-    fun forExercise(exercise: Exercise): ExerciseProfile = all.getValue(exercise)
+    /**
+     * [variant] `null` (the default) resolves [exercise]'s own profile; a
+     * non-null value resolves that Exercise Variant's profile instead
+     * (`workout-partner-v3` ticket 08) — the caller is expected to pass a
+     * [variant] whose [ExerciseVariant.parentExercise] matches [exercise].
+     */
+    fun forExercise(exercise: Exercise, variant: ExerciseVariant? = null): ExerciseProfile {
+        require(variant == null || variant.parentExercise == exercise) {
+            "$variant is not a variant of $exercise (its parent is ${variant?.parentExercise})"
+        }
+        return all.getValue(exercise to variant)
+    }
 }

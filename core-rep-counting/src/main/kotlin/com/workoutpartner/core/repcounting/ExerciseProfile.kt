@@ -2,7 +2,12 @@ package com.workoutpartner.core.repcounting
 
 /**
  * The joint-angle configuration [RepCounter] uses to count Reps and grade
- * form for one [Exercise].
+ * form for one [Exercise] — or, since `workout-partner-v3` ticket 08, one of
+ * its [ExerciseVariant]s instead, when [variant] is set. A variant's profile
+ * still carries the parent [exercise] (matching how `data`'s persistence
+ * layer stores it: a non-null Exercise column plus a separate, optional
+ * Exercise Variant one), so [RepEvent]'s own `exercise` field is unaffected
+ * by which profile produced it.
  *
  * @property jointA one end of the angle, together with [jointC]
  * @property vertex the joint the angle is measured at (see [Angle.between])
@@ -23,4 +28,5 @@ data class ExerciseProfile(
     val direction: RepDirection,
     val repThresholdDegrees: Float,
     val formThresholdDegrees: Float,
+    val variant: ExerciseVariant? = null,
 )

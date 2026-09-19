@@ -50,6 +50,8 @@ class RepCounter private constructor(private val profile: ExerciseProfile) {
     }
 
     companion object {
-        fun forExercise(exercise: Exercise): RepCounter = RepCounter(ExerciseProfiles.forExercise(exercise))
+        /** [variant] resolves an Exercise Variant's own profile instead of [exercise]'s (`workout-partner-v3` ticket 08) — see [ExerciseProfiles.forExercise]. */
+        fun forExercise(exercise: Exercise, variant: ExerciseVariant? = null): RepCounter =
+            RepCounter(ExerciseProfiles.forExercise(exercise, variant))
     }
 }

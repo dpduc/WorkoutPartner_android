@@ -120,6 +120,7 @@ class SessionViewModel(
                 timestamp = Instant.now(clock),
                 today = LocalDate.now(clock),
                 zone = clock.zone,
+                exerciseVariant = completed.variant,
             )
             refreshAccount()
         }

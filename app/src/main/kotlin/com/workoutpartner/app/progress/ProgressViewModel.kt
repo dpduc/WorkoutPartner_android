@@ -42,7 +42,7 @@ class ProgressViewModel(
         val currentStreak: Int = 0,
         val bankedShields: Int = 0,
         val activeDays: Set<LocalDate> = emptySet(),
-        val personalBests: Map<Exercise, PersonalBest> = emptyMap(),
+        val personalBests: Map<TrackedExercise, PersonalBest> = emptyMap(),
     )
 
     private val _uiState = MutableStateFlow(UiState())

@@ -1,12 +1,24 @@
 package com.workoutpartner.app.progress
 
 import com.workoutpartner.core.repcounting.Exercise
+import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.data.SetEntity
 import java.time.LocalDate
 import java.time.ZoneId
 
 /** An Exercise's Personal Best (CONTEXT.md): "highest recorded rep count or Form Score... across all their Sets." The two highs are tracked independently — the Set with the most reps need not be the Set with the best form. */
 data class PersonalBest(val bestReps: Int, val bestFormScore: Int)
+
+/**
+ * An Exercise, optionally narrowed to one of its [ExerciseVariant]s
+ * (`workout-partner-v3` ticket 08) — the key [ProgressStats.personalBests]
+ * groups by, since CONTEXT.md's Personal Best entry calls for a Step Jack
+ * and a Jumping Jack to each have their own. A named type rather than a
+ * bare `Pair<Exercise, ExerciseVariant?>`, since the two travel together
+ * everywhere this key is used (`ProgressViewModel`, `ProgressScreen`) and a
+ * `Pair` gives call sites nothing to hang a meaningful name on.
+ */
+data class TrackedExercise(val exercise: Exercise, val variant: ExerciseVariant? = null)
 
 /** One point on an Exercise's Form Score trend line (spec.md story 25), in chronological order. */
 data class FormScorePoint(val date: LocalDate, val formScore: Int)
@@ -29,9 +41,9 @@ object ProgressStats {
     fun activeDays(sets: List<SetEntity>, zone: ZoneId): Set<LocalDate> =
         sets.map { it.timestamp.atZone(zone).toLocalDate() }.toSet()
 
-    /** One [PersonalBest] per Exercise that has at least one Set; an Exercise never attempted has no entry. */
-    fun personalBests(sets: List<SetEntity>): Map<Exercise, PersonalBest> =
-        sets.groupBy { it.exercise }.mapValues { (_, exerciseSets) ->
+    /** One [PersonalBest] per [TrackedExercise] that has at least one Set; a combination never attempted has no entry. */
+    fun personalBests(sets: List<SetEntity>): Map<TrackedExercise, PersonalBest> =
+        sets.groupBy { TrackedExercise(it.exercise, it.exerciseVariant) }.mapValues { (_, exerciseSets) ->
             PersonalBest(
                 bestReps = exerciseSets.maxOf { it.actualReps },
                 bestFormScore = exerciseSets.maxOf { it.formScore },

@@ -1,6 +1,7 @@
 package com.workoutpartner.app.progress
 
 import com.workoutpartner.core.repcounting.Exercise
+import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.data.SetEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -35,7 +36,7 @@ class ProgressStatsTest {
 
         val bests = ProgressStats.personalBests(sets)
 
-        assertEquals(PersonalBest(bestReps = 20, bestFormScore = 95), bests.getValue(Exercise.SQUAT))
+        assertEquals(PersonalBest(bestReps = 20, bestFormScore = 95), bests.getValue(TrackedExercise(Exercise.SQUAT)))
     }
 
     @Test
@@ -44,7 +45,20 @@ class ProgressStatsTest {
 
         val bests = ProgressStats.personalBests(sets)
 
-        assertNull(bests[Exercise.PUSH_UP])
+        assertNull(bests[TrackedExercise(Exercise.PUSH_UP)])
+    }
+
+    @Test
+    fun `personalBests keeps a Step Jack Set separate from a Jumping Jack Set of the same parent Exercise`() {
+        val sets = listOf(
+            setOn("2024-01-01T09:00:00Z", Exercise.JUMPING_JACK, actualReps = 20, formScore = 90),
+            setOn("2024-01-02T09:00:00Z", Exercise.JUMPING_JACK, actualReps = 30, formScore = 60, variant = ExerciseVariant.STEP_JACK),
+        )
+
+        val bests = ProgressStats.personalBests(sets)
+
+        assertEquals(PersonalBest(bestReps = 20, bestFormScore = 90), bests.getValue(TrackedExercise(Exercise.JUMPING_JACK)))
+        assertEquals(PersonalBest(bestReps = 30, bestFormScore = 60), bests.getValue(TrackedExercise(Exercise.JUMPING_JACK, ExerciseVariant.STEP_JACK)))
     }
 
     @Test
@@ -66,8 +80,14 @@ class ProgressStatsTest {
         )
     }
 
-    private fun setOn(isoTimestamp: String, exercise: Exercise, actualReps: Int, formScore: Int) = SetEntity(
-        id = "set-$isoTimestamp-${exercise.name}",
+    private fun setOn(
+        isoTimestamp: String,
+        exercise: Exercise,
+        actualReps: Int,
+        formScore: Int,
+        variant: ExerciseVariant? = null,
+    ) = SetEntity(
+        id = "set-$isoTimestamp-${exercise.name}-${variant?.name}",
         sessionId = "session-1",
         exercise = exercise,
         targetReps = actualReps,
@@ -75,5 +95,6 @@ class ProgressStatsTest {
         formScore = formScore,
         goodSet = formScore >= 80,
         timestamp = Instant.parse(isoTimestamp),
+        exerciseVariant = variant,
     )
 }

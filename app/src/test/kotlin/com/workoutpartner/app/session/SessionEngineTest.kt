@@ -2,6 +2,7 @@ package com.workoutpartner.app.session
 
 import com.workoutpartner.core.posetracking.PoseTrackingSignal
 import com.workoutpartner.core.repcounting.Exercise
+import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.core.repcounting.Landmark
 import com.workoutpartner.core.repcounting.PoseLandmarkFrame
 import com.workoutpartner.core.repcounting.Point3D
@@ -191,6 +192,30 @@ class SessionEngineTest {
         assertEquals(Exercise.SQUAT, phase.completedSets.single().exercise)
     }
 
+    @Test
+    fun `a Step Jack step judges Good Set against Step Jack's own 135-degree form threshold, not Jumping Jack's 150-degree one`() {
+        // 140 degrees clears Step Jack's form threshold (135) but falls
+        // short of Jumping Jack's (150) — the exact same physical sweep
+        // should grade differently depending on which the step is.
+        val stepJackEngine = trackingEngine(
+            RoutineStep(Exercise.JUMPING_JACK, targetReps = 1, restIntervalSeconds = 30, variant = ExerciseVariant.STEP_JACK),
+        )
+        completeOneJumpingJackFamilyRepAt(stepJackEngine, sweepAngle = 140f)
+        stepJackEngine.finishSet()
+        val stepJackSet = (stepJackEngine.phase as SessionPhase.SetSummary).completedSet
+        assertEquals(ExerciseVariant.STEP_JACK, stepJackSet.variant)
+        assertEquals(100, stepJackSet.formScore)
+        assertTrue(stepJackSet.goodSet)
+
+        val jumpingJackEngine = trackingEngine(RoutineStep(Exercise.JUMPING_JACK, targetReps = 1, restIntervalSeconds = 30))
+        completeOneJumpingJackFamilyRepAt(jumpingJackEngine, sweepAngle = 140f)
+        jumpingJackEngine.finishSet()
+        val jumpingJackSet = (jumpingJackEngine.phase as SessionPhase.SetSummary).completedSet
+        assertEquals(null, jumpingJackSet.variant)
+        assertEquals(0, jumpingJackSet.formScore)
+        assertFalse(jumpingJackSet.goodSet)
+    }
+
     private fun trackingEngine(vararg steps: RoutineStep): SessionEngine {
         val engine = SessionEngine(steps.toList())
         repeat(SessionEngine.COUNTDOWN_SECONDS) { engine.onTick() }
@@ -213,5 +238,24 @@ class SessionEngineTest {
                 Landmark.ANKLE to Point3D(cos(radians).toFloat(), sin(radians).toFloat(), 0f),
             ),
         )
+    }
+
+    /** Jumping Jack's (and Step Jack's — same joints, ticket 08) elbow-shoulder-hip angle, reading exactly [angleDegrees]. */
+    private fun jumpingJackFamilyFrameAtAngle(angleDegrees: Float): PoseLandmarkFrame {
+        val radians = Math.toRadians(angleDegrees.toDouble())
+        return PoseLandmarkFrame(
+            mapOf(
+                Landmark.ELBOW to Point3D(1f, 0f, 0f),
+                Landmark.SHOULDER to Point3D(0f, 0f, 0f),
+                Landmark.HIP to Point3D(cos(radians).toFloat(), sin(radians).toFloat(), 0f),
+            ),
+        )
+    }
+
+    /** A rep from well below both Jumping Jack's (90) and Step Jack's (75) rep thresholds, up to [sweepAngle], and back. */
+    private fun completeOneJumpingJackFamilyRepAt(engine: SessionEngine, sweepAngle: Float) {
+        engine.onPoseSignal(PoseTrackingSignal.Trackable(jumpingJackFamilyFrameAtAngle(40f)))
+        engine.onPoseSignal(PoseTrackingSignal.Trackable(jumpingJackFamilyFrameAtAngle(sweepAngle)))
+        engine.onPoseSignal(PoseTrackingSignal.Trackable(jumpingJackFamilyFrameAtAngle(40f)))
     }
 }
