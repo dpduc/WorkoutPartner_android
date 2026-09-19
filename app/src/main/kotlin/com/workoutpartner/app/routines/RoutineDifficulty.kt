@@ -1,20 +1,21 @@
 package com.workoutpartner.app.routines
 
 import com.workoutpartner.data.AccountEntity
+import com.workoutpartner.data.ActivityLevel
 import com.workoutpartner.data.GuestProfileEntity
 import kotlin.math.roundToInt
 
 /**
- * The age/height/weight a difficulty tier is computed from — deliberately
- * not [AccountEntity] itself: a Guest (`workout-partner-v2` ticket 01) has
- * the same three answers on a [GuestProfileEntity] instead, and this tuning
- * applies to both, per the ticket's "collect for everyone at first use"
- * decision.
+ * The age/height/weight/[ActivityLevel] a difficulty tier is computed from
+ * — deliberately not [AccountEntity] itself: a Guest (`workout-partner-v2`
+ * ticket 01) has the same answers on a [GuestProfileEntity] instead, and
+ * this tuning applies to both, per the ticket's "collect for everyone at
+ * first use" decision.
  */
-data class BodyStats(val age: Int?, val heightCm: Int?, val weightKg: Double?)
+data class BodyStats(val age: Int?, val heightCm: Int?, val weightKg: Double?, val activityLevel: ActivityLevel? = null)
 
-fun AccountEntity.toBodyStats() = BodyStats(age, heightCm, weightKg)
-fun GuestProfileEntity.toBodyStats() = BodyStats(age, heightCm, weightKg)
+fun AccountEntity.toBodyStats() = BodyStats(age, heightCm, weightKg, activityLevel)
+fun GuestProfileEntity.toBodyStats() = BodyStats(age, heightCm, weightKg, activityLevel)
 
 enum class DifficultyTier { EASY, STANDARD, CHALLENGING }
 
@@ -23,13 +24,15 @@ private enum class AgeBand { YOUNGER, MIDDLE, OLDER }
 
 /**
  * Scales a Routine's rep targets/rest intervals from an Account's (or
- * Guest's) body stats — BMI (from height/weight) combined with an age band,
- * per the user's own confirmed decision to use body data rather than only
- * the self-reported Activity Level. Reasonable-default thresholds, the same
- * "defensible default, documented as a placeholder, not a settled clinical
- * formula" spirit as [com.workoutpartner.app.session.SessionEngine]'s own
- * Good Set threshold and core-rep-counting's angle thresholds — not
- * medical/fitness advice, and not spec-derived.
+ * Guest's) body stats — BMI (from height/weight) and an age band, plus
+ * (since `workout-partner-v3` ticket 07) the self-reported [ActivityLevel]:
+ * Sedentary -1, Lightly Active/Active 0 (unchanged from the pre-ticket-07
+ * behavior, where Activity Level didn't score at all), Very Active +1,
+ * missing 0. Reasonable-default thresholds, the same "defensible default,
+ * documented as a placeholder, not a settled clinical formula" spirit as
+ * [com.workoutpartner.app.session.SessionEngine]'s own Good Set threshold
+ * and core-rep-counting's angle thresholds — not medical/fitness advice,
+ * and not spec-derived.
  *
  * Applied at Session-start time when [com.workoutpartner.app.session.SessionViewModel]
  * builds its engine steps, not by mutating the seeded `RoutineEntity`/
@@ -53,7 +56,12 @@ object RoutineDifficulty {
             AgeBand.MIDDLE -> 0
             AgeBand.OLDER -> -1
         }
-        val total = bmiScore + ageScore
+        val activityScore = when (stats.activityLevel) {
+            ActivityLevel.SEDENTARY -> -1
+            ActivityLevel.LIGHTLY_ACTIVE, ActivityLevel.ACTIVE, null -> 0
+            ActivityLevel.VERY_ACTIVE -> 1
+        }
+        val total = bmiScore + ageScore + activityScore
         return when {
             total >= 2 -> DifficultyTier.CHALLENGING
             total <= -1 -> DifficultyTier.EASY

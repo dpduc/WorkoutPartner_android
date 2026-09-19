@@ -193,7 +193,7 @@ fun WorkoutPartnerApp(container: AppContainer) {
                 // The accountId-keyed LaunchedEffect above won't re-fire for
                 // a Guest (accountId stays null) — update directly so
                 // RoutineDifficulty sees this answer immediately.
-                bodyStats = BodyStats(age, heightCm, weightKg)
+                bodyStats = BodyStats(age, heightCm, weightKg, activityLevel)
             },
             onDone = { prefs.hasCompletedProfile = true; screen = AppScreen.MainMenu },
         )

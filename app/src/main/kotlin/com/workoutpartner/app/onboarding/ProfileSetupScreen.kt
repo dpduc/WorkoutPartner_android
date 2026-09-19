@@ -10,9 +10,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.workoutpartner.app.ui.components.ActivityLevelPicker
 import com.workoutpartner.data.ActivityLevel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -35,9 +33,8 @@ import kotlinx.coroutines.launch
  * signing back in already has these from its own prior sign-up, so
  * `MainActivity` never routes `AppScreen.SignIn` through this screen.
  *
- * The segmented-button control below is a placeholder: `workout-partner-v3`
- * ticket 07 replaces it with four illustrated cards. This screen only needed
- * to keep compiling once ticket 02 widened [ActivityLevel] to four tiers.
+ * The Activity Level picker itself is [ActivityLevelPicker] (`workout-partner-v3`
+ * ticket 07) — four cards, shared with [com.workoutpartner.app.settings.SettingsScreen].
  *
  * [onSubmit] is where the caller decides where the answers land: a Guest's
  * go to `AccountRepository.saveGuestProfile` (claimed onto a real Account
@@ -102,17 +99,11 @@ fun ProfileSetupScreen(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             )
             Text("Daily activity level", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 20.dp))
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                ActivityLevel.entries.forEachIndexed { index, level ->
-                    SegmentedButton(
-                        selected = activityLevel == level,
-                        onClick = { activityLevel = level },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = ActivityLevel.entries.size),
-                    ) {
-                        Text(level.displayLabel())
-                    }
-                }
-            }
+            ActivityLevelPicker(
+                selected = activityLevel,
+                onSelected = { activityLevel = it },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
             errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 12.dp)) }
             Button(
                 onClick = {
@@ -142,11 +133,4 @@ fun ProfileSetupScreen(
             }
         }
     }
-}
-
-private fun ActivityLevel.displayLabel(): String = when (this) {
-    ActivityLevel.SEDENTARY -> "Sedentary"
-    ActivityLevel.LIGHTLY_ACTIVE -> "Lightly Active"
-    ActivityLevel.ACTIVE -> "Active"
-    ActivityLevel.VERY_ACTIVE -> "Very Active"
 }

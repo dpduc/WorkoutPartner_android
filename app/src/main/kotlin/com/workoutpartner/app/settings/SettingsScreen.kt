@@ -12,9 +12,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -32,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.workoutpartner.app.ui.components.ActivityLevelPicker
 import com.workoutpartner.data.AccountRepository
 import com.workoutpartner.data.ActivityLevel
 import com.workoutpartner.data.AuthRepository
@@ -121,17 +119,11 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     )
                     Text("Daily activity level", modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        ActivityLevel.entries.forEachIndexed { index, level ->
-                            SegmentedButton(
-                                selected = activityLevel == level,
-                                onClick = { activityLevel = level },
-                                shape = SegmentedButtonDefaults.itemShape(index = index, count = ActivityLevel.entries.size),
-                            ) {
-                                Text(level.name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase))
-                            }
-                        }
-                    }
+                    ActivityLevelPicker(
+                        selected = activityLevel,
+                        onSelected = { activityLevel = it },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     val age = ageInput.toIntOrNull()
                     val heightCm = heightInput.toIntOrNull()
                     val weightKg = weightInput.toDoubleOrNull()
