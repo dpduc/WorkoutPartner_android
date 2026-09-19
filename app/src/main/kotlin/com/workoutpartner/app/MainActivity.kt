@@ -43,7 +43,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.workoutpartner.app.beforeyoustart.WorkoutOverviewScreen
+import com.workoutpartner.app.beforeyoustart.BeforeYouStartScreen
+import com.workoutpartner.app.beforeyoustart.FormGuidePrefs
 import com.workoutpartner.app.data.BundledRoutines
 import com.workoutpartner.app.di.AppContainer
 import com.workoutpartner.app.onboarding.DisclaimerScreen
@@ -101,6 +102,7 @@ class MainActivity : ComponentActivity() {
 fun WorkoutPartnerApp(container: AppContainer) {
     val context = LocalContext.current
     val prefs = remember { OnboardingPrefs(context) }
+    val formGuidePrefs = remember { FormGuidePrefs(context) }
     var screen by remember {
         mutableStateOf<AppScreen>(
             when {
@@ -242,11 +244,11 @@ fun WorkoutPartnerApp(container: AppContainer) {
                 )
             },
         ) { padding ->
-            WorkoutOverviewScreen(
+            BeforeYouStartScreen(
                 routine = current.routine,
                 difficultyTier = difficultyTier,
-                onReviewForm = {},
-                onStart = { screen = AppScreen.Session(current.routine) },
+                formGuidePrefs = formGuidePrefs,
+                onReadyForSession = { screen = AppScreen.Session(current.routine) },
                 modifier = Modifier.padding(padding),
             )
         }

@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.workoutpartner.app.progress.TrackedExercise
 import com.workoutpartner.app.routines.DifficultyTier
 import com.workoutpartner.app.routines.RoutineDifficulty
 import com.workoutpartner.data.RoutineWithSteps
@@ -26,15 +27,15 @@ import com.workoutpartner.data.RoutineWithSteps
  * estimated duration, difficulty tier, each Exercise with its
  * difficulty-adjusted rep target, and safety notes (spec.md stories 47-49).
  *
- * Doesn't touch [BeforeYouStartEngine] yet: Form Guides/Position Check/
- * Countdown have no real UI (tickets 10/12/13 add it), so this ticket's
- * flow is just Overview then straight into the Session — the engine's own
- * tests are what prove out the phase sequence for now; wiring a screen to
- * it starts once a phase after Overview actually has something to show.
+ * Purely presentational — doesn't touch [BeforeYouStartEngine] itself;
+ * [BeforeYouStartScreen] is what owns the engine and decides, from
+ * [onStart], whether Form Guides needs to run before the Session starts
+ * (`workout-partner-v3` ticket 10). This screen only renders the Overview
+ * phase and reports the two things the Athlete can do from it.
  *
  * "Review form" (spec.md story 50: "always available... even after I've
- * seen it") is disabled here — ticket 10 is what gives it Form Guides to
- * actually open.
+ * seen it") always opens the full set of guides via [onReviewForm]
+ * (ticket 10) — unlike [onStart], never gated on seen-state.
  */
 @Composable
 fun WorkoutOverviewScreen(
@@ -93,8 +94,8 @@ fun WorkoutOverviewScreen(
 
             HorizontalDivider()
 
-            OutlinedButton(onClick = onReviewForm, enabled = false, modifier = Modifier.fillMaxWidth()) {
-                Text("Review form (coming soon)")
+            OutlinedButton(onClick = onReviewForm, modifier = Modifier.fillMaxWidth()) {
+                Text("Review form")
             }
             Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
                 Text("Start")
@@ -104,6 +105,17 @@ fun WorkoutOverviewScreen(
 }
 
 private data class StepDisplay(val exerciseLabel: String, val adjustedReps: Int)
+
+/**
+ * The distinct [TrackedExercise]s a Routine's steps cover (`workout-partner-v3`
+ * ticket 10) — what [BeforeYouStartScreen] checks against [FormGuidePrefs]
+ * to decide which Form Guides are unseen. Always variant-less for now:
+ * [com.workoutpartner.data.RoutineStepEntity] has no Variant column of its
+ * own (a Routine's Jumping Jack steps aren't switched to Step Jack until
+ * ticket 11 picks one per-Session), so every entry here is a base Exercise
+ * until that ticket threads a chosen Variant through.
+ */
+fun RoutineWithSteps.trackedExercises(): List<TrackedExercise> = steps.map { TrackedExercise(it.exercise) }.distinct()
 
 /** `JUMPING_JACK` -> `Jumping jack`; shared by the difficulty tier and Exercise labels above. */
 private fun humanizeEnumName(name: String): String = name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase)

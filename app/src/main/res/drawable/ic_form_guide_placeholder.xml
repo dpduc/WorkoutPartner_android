@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared placeholder art for every Form Guide (ticket 10): a generic
+     standing-figure silhouette. Real per-Exercise/Variant photography is a
+     content task, not something this ticket can produce — FormGuideResources
+     already keys the image per Exercise/Variant, so swapping in real art
+     later for each of the six guides is a one-line resource-id change here,
+     not a redesign of the Form Guide model or screen. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#9E9E9E"
+        android:pathData="M9,6a3,3 0 1,0 6,0a3,3 0 1,0 -6,0z M9,10h6v10h-6z" />
+</vector>

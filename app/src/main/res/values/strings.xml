@@ -7,4 +7,93 @@
     <string name="reminder_channel_name">Daily Streak Reminder</string>
     <string name="reminder_notification_title">Keep your Streak going</string>
     <string name="reminder_notification_text">You haven\'t logged an Active Day yet this week.</string>
+
+    <!-- Ticket 10: Form Guide content, bundled per Exercise/Variant (all
+         five Exercises plus Step Jack) rather than inline in Compose like
+         the rest of this app's copy, per this ticket's own checklist. -->
+    <string name="form_guide_squat_name">Squat</string>
+    <string name="form_guide_squat_starting_position">Stand with feet shoulder-width apart, weight in your heels, chest up.</string>
+    <string-array name="form_guide_squat_cues">
+        <item>Push your hips back like sitting into a chair</item>
+        <item>Keep your knees tracking over your toes</item>
+        <item>Drive through your heels to stand back up</item>
+    </string-array>
+    <string-array name="form_guide_squat_mistakes">
+        <item>Knees caving inward</item>
+        <item>Rounding the lower back</item>
+        <item>Heels lifting off the ground</item>
+    </string-array>
+    <string name="form_guide_squat_tracker_check">Tracks the angle at your knee to judge how deep you squat and how consistently you return to standing.</string>
+
+    <string name="form_guide_push_up_name">Push-up</string>
+    <string name="form_guide_push_up_starting_position">Hands slightly wider than shoulders, body in a straight line from head to heels.</string>
+    <string-array name="form_guide_push_up_cues">
+        <item>Lower your chest toward the floor with elbows at about 45°</item>
+        <item>Keep your core tight so your hips don\'t sag</item>
+        <item>Push back up to a full arm extension</item>
+    </string-array>
+    <string-array name="form_guide_push_up_mistakes">
+        <item>Hips sagging or piking up</item>
+        <item>Flaring elbows straight out to the sides</item>
+        <item>Not lowering far enough to count as a full rep</item>
+    </string-array>
+    <string name="form_guide_push_up_tracker_check">Tracks the angle at your elbow to judge how far you lower and how fully you press back up.</string>
+
+    <string name="form_guide_sit_up_name">Sit-up</string>
+    <string name="form_guide_sit_up_starting_position">Lie on your back, knees bent, feet flat, hands lightly behind your head or crossed on your chest.</string>
+    <string-array name="form_guide_sit_up_cues">
+        <item>Curl your torso up leading with your chest, not your neck</item>
+        <item>Keep your feet flat on the floor throughout</item>
+        <item>Lower back down under control</item>
+    </string-array>
+    <string-array name="form_guide_sit_up_mistakes">
+        <item>Yanking on your neck with your hands</item>
+        <item>Using momentum instead of your core</item>
+        <item>Feet lifting off the floor</item>
+    </string-array>
+    <string name="form_guide_sit_up_tracker_check">Tracks the angle at your hip to judge how far you curl up and how far you return down.</string>
+
+    <string name="form_guide_lunge_name">Lunge</string>
+    <string name="form_guide_lunge_starting_position">Stand tall, feet hip-width apart.</string>
+    <string-array name="form_guide_lunge_cues">
+        <item>Step forward and lower until both knees are close to 90°</item>
+        <item>Keep your front knee over your ankle, not past your toes</item>
+        <item>Push back through your front heel to return to standing</item>
+    </string-array>
+    <string-array name="form_guide_lunge_mistakes">
+        <item>Front knee collapsing inward</item>
+        <item>Leaning the torso too far forward</item>
+        <item>Back knee slamming into the floor</item>
+    </string-array>
+    <string name="form_guide_lunge_tracker_check">Tracks the angle at your front knee to judge how deep each lunge goes and how consistently you return to standing.</string>
+
+    <string name="form_guide_jumping_jack_name">Jumping Jack</string>
+    <string name="form_guide_jumping_jack_starting_position">Stand tall with feet together, arms at your sides.</string>
+    <string-array name="form_guide_jumping_jack_cues">
+        <item>Jump your feet out while raising your arms overhead</item>
+        <item>Keep the movement quick and rhythmic</item>
+        <item>Jump back to the starting position to complete the rep</item>
+    </string-array>
+    <string-array name="form_guide_jumping_jack_mistakes">
+        <item>Arms not reaching overhead</item>
+        <item>Feet barely leaving the ground</item>
+        <item>Losing rhythm between reps</item>
+    </string-array>
+    <string name="form_guide_jumping_jack_tracker_check">Tracks the angle at your shoulder to judge how high your arms swing on each rep.</string>
+
+    <!-- Step Jack (workout-partner-v3 ticket 08): a low-impact Jumping Jack
+         variant, distinct Form Guide per this ticket's own checklist. -->
+    <string name="form_guide_step_jack_name">Step Jack</string>
+    <string name="form_guide_step_jack_starting_position">Stand tall with feet together, arms at your sides — same as Jumping Jack, without the jump.</string>
+    <string-array name="form_guide_step_jack_cues">
+        <item>Step one foot out to the side while raising your arms overhead</item>
+        <item>Step back to the middle to complete the rep</item>
+        <item>Alternate sides at a steady, controlled pace</item>
+    </string-array>
+    <string-array name="form_guide_step_jack_mistakes">
+        <item>Shifting weight without actually stepping the foot out</item>
+        <item>Arms not raising enough to register</item>
+        <item>Rushing the step-together return</item>
+    </string-array>
+    <string name="form_guide_step_jack_tracker_check">Tracks the angle at your shoulder just like Jumping Jack, but counts a rep at a lower arm-raise angle to match the lower-impact movement.</string>
 </resources>
