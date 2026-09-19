@@ -14,10 +14,10 @@ import com.workoutpartner.core.repcounting.RepEvent
  * core-streaks use. [SessionViewModel] maps `RoutineStepEntity` onto this.
  *
  * [variant] (`workout-partner-v3` ticket 08) picks an [ExerciseVariant] of
- * [exercise] instead of its standard form — null by default, since no
- * Routine content or UI produces one yet (that's ticket 11's job; this
- * ticket only wires the engine so a caller that does pass one works end to
- * end).
+ * [exercise] instead of its standard form — null by default. `RoutineStepEntity`
+ * itself still names only the base Exercise; [SessionViewModel] is what
+ * substitutes in the Athlete's per-Session choice for Jumping Jack steps
+ * (ticket 11's Workout Overview toggle) when it maps entities onto these.
  */
 data class RoutineStep(
     val exercise: Exercise,

@@ -1,6 +1,7 @@
 package com.workoutpartner.app
 
 import com.workoutpartner.core.repcounting.Exercise
+import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.data.RoutineWithSteps
 import com.workoutpartner.data.TrackedProfileEntity
 
@@ -44,7 +45,13 @@ sealed interface AppScreen {
      * [com.workoutpartner.app.beforeyoustart.WorkoutOverviewScreen].
      */
     data class WorkoutOverview(val routine: RoutineWithSteps) : AppScreen
-    data class Session(val routine: RoutineWithSteps) : AppScreen
+
+    /**
+     * [jumpingJackVariant] (`workout-partner-v3` ticket 11) is the Athlete's
+     * Overview toggle choice for this Session's Jumping Jack steps only —
+     * `null` means plain Jumping Jack, never persisted between Sessions.
+     */
+    data class Session(val routine: RoutineWithSteps, val jumpingJackVariant: ExerciseVariant? = null) : AppScreen
     data object Progress : AppScreen
     data object Settings : AppScreen
     data object Roster : AppScreen

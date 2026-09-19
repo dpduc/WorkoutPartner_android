@@ -85,6 +85,20 @@ object RoutineDifficulty {
         return (baseRestIntervalSeconds / repMultiplierFor(tier)).roundToInt().coerceAtLeast(0)
     }
 
+    /**
+     * BMI ≥ 30 — [BmiCategory.OBESE]'s own cutoff, exposed as its own
+     * question for `workout-partner-v3` ticket 11's Step Jack default
+     * (missing height/weight defaults to `false`, the same "no data, no
+     * adjustment" fallback [compute] uses for a missing [BodyStats]).
+     * Reuses [bmiCategory] rather than re-deriving the BMI formula.
+     */
+    fun isObese(stats: BodyStats?): Boolean {
+        val heightCm = stats?.heightCm
+        val weightKg = stats?.weightKg
+        if (heightCm == null || weightKg == null || heightCm <= 0) return false
+        return bmiCategory(heightCm, weightKg) == BmiCategory.OBESE
+    }
+
     private fun bmiCategory(heightCm: Int, weightKg: Double): BmiCategory {
         val heightM = heightCm / 100.0
         val bmi = weightKg / (heightM * heightM)

@@ -107,4 +107,21 @@ class RoutineDifficultyTest {
         assertEquals(0, RoutineDifficulty.adjustedRestIntervalSeconds(0, DifficultyTier.CHALLENGING))
         assertEquals(0, RoutineDifficulty.adjustedRestIntervalSeconds(0, DifficultyTier.EASY))
     }
+
+    @Test
+    fun `isObese is true at a BMI of exactly 30`() {
+        assertEquals(true, RoutineDifficulty.isObese(BodyStats(age = 40, heightCm = 170, weightKg = 86.7)))
+    }
+
+    @Test
+    fun `isObese is false just under a BMI of 30`() {
+        assertEquals(false, RoutineDifficulty.isObese(BodyStats(age = 40, heightCm = 170, weightKg = 80.0)))
+    }
+
+    @Test
+    fun `isObese is false when stats are null or incomplete`() {
+        assertEquals(false, RoutineDifficulty.isObese(null))
+        assertEquals(false, RoutineDifficulty.isObese(BodyStats(age = 40, heightCm = 170, weightKg = null)))
+        assertEquals(false, RoutineDifficulty.isObese(BodyStats(age = 40, heightCm = null, weightKg = 90.0)))
+    }
 }

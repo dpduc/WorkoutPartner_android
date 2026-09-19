@@ -247,8 +247,9 @@ fun WorkoutPartnerApp(container: AppContainer) {
             BeforeYouStartScreen(
                 routine = current.routine,
                 difficultyTier = difficultyTier,
+                defaultToStepJack = RoutineDifficulty.isObese(bodyStats),
                 formGuidePrefs = formGuidePrefs,
-                onReadyForSession = { screen = AppScreen.Session(current.routine) },
+                onReadyForSession = { jumpingJackVariant -> screen = AppScreen.Session(current.routine, jumpingJackVariant) },
                 modifier = Modifier.padding(padding),
             )
         }
@@ -269,6 +270,7 @@ fun WorkoutPartnerApp(container: AppContainer) {
                     accountRepository = container.accountRepository,
                     poseTrackerFactory = container::createPoseTracker,
                     difficultyTier = difficultyTier,
+                    jumpingJackVariant = current.jumpingJackVariant,
                     onSetFinished = {
                         // The post-Set prompt to create an Account while
                         // still a Guest (ticket 13, spec.md story 3) — this

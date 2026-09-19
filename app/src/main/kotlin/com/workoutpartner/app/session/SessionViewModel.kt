@@ -6,9 +6,11 @@ import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.workoutpartner.app.beforeyoustart.resolveVariant
 import com.workoutpartner.app.routines.DifficultyTier
 import com.workoutpartner.app.routines.RoutineDifficulty
 import com.workoutpartner.core.posetracking.PoseTracker
+import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.data.AccountEntity
 import com.workoutpartner.data.AccountRepository
 import com.workoutpartner.data.RoutineWithSteps
@@ -45,6 +47,8 @@ class SessionViewModel(
     private val poseTracker: PoseTracker,
     /** Computed from the Account's (or Guest's) body stats by the caller — see [RoutineDifficulty]. Defaults to [DifficultyTier.STANDARD] (unscaled) when the caller has no profile data yet. */
     private val difficultyTier: DifficultyTier = DifficultyTier.STANDARD,
+    /** The Athlete's Overview toggle choice (`workout-partner-v3` ticket 11) — applied to every Jumping Jack step in [routine], for this Session only. `null` leaves them as plain Jumping Jack. */
+    private val jumpingJackVariant: ExerciseVariant? = null,
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
 
@@ -54,6 +58,7 @@ class SessionViewModel(
                 exercise = it.exercise,
                 targetReps = RoutineDifficulty.adjustedTargetReps(it.targetReps, difficultyTier),
                 restIntervalSeconds = RoutineDifficulty.adjustedRestIntervalSeconds(it.restIntervalSeconds, difficultyTier),
+                variant = resolveVariant(it.exercise, jumpingJackVariant),
             )
         },
     )

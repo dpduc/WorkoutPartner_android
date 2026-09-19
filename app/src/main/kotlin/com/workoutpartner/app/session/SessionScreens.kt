@@ -36,6 +36,7 @@ import com.workoutpartner.data.AccountRepository
 import com.workoutpartner.data.RoutineWithSteps
 import com.workoutpartner.data.SetRepository
 import com.workoutpartner.core.posetracking.PoseTracker
+import com.workoutpartner.core.repcounting.ExerciseVariant
 
 /**
  * Routine picker (ticket 09): the entry point into a Session — bundled
@@ -96,6 +97,8 @@ fun SessionScreen(
     accountRepository: AccountRepository,
     poseTrackerFactory: () -> PoseTracker,
     difficultyTier: DifficultyTier = DifficultyTier.STANDARD,
+    /** The Athlete's Overview toggle choice for this Session's Jumping Jack steps (`workout-partner-v3` ticket 11) — see [SessionViewModel]. */
+    jumpingJackVariant: ExerciseVariant? = null,
     onSetFinished: () -> Unit = {},
     onSessionComplete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -104,7 +107,7 @@ fun SessionScreen(
         factory = remember {
             viewModelFactory {
                 initializer {
-                    SessionViewModel(routine, accountId, setRepository, accountRepository, poseTrackerFactory(), difficultyTier)
+                    SessionViewModel(routine, accountId, setRepository, accountRepository, poseTrackerFactory(), difficultyTier, jumpingJackVariant)
                 }
             }
         },
