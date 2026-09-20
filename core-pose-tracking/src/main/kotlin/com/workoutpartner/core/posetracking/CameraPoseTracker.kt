@@ -48,6 +48,13 @@ class CameraPoseTracker(private val context: Context) : PoseTracker {
         awaitClose { emitSignal = null }
     }
 
+    private var emitRawFrame: ((RawPoseFrame) -> Unit)? = null
+
+    override val rawFrames: Flow<RawPoseFrame> = callbackFlow {
+        emitRawFrame = { trySend(it) }
+        awaitClose { emitRawFrame = null }
+    }
+
     override val errors: Flow<String> = callbackFlow {
         emitError = { trySend(it) }
         awaitClose { emitError = null }
@@ -147,6 +154,7 @@ class CameraPoseTracker(private val context: Context) : PoseTracker {
             // `firstOrNull()` as a soft, after-the-fact guard).
             .setNumPoses(1)
             .setResultListener { result, _ ->
+                emitRawFrame?.invoke(result.toRawPoseFrame())
                 val frame = PoseFrameMapper.toPoseLandmarkFrame(result.toRawLandmarks())
                 emitSignal?.invoke(trackingStateMachine.accept(frame))
             }

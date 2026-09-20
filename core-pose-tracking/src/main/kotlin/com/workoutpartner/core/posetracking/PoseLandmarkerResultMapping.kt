@@ -23,6 +23,10 @@ fun PoseLandmarkerResult.toRawLandmarks(): Map<MediaPipePoseLandmark, RawPoseLan
     }.toMap()
 }
 
+/** Every landmark of the first detected pose, in MediaPipe index order; empty if none was detected. Same single-person policy as [toRawLandmarks]. */
+fun PoseLandmarkerResult.toRawPoseFrame(): RawPoseFrame =
+    RawPoseFrame(landmarks().firstOrNull()?.map { it.toRawPoseLandmark() } ?: emptyList())
+
 private fun NormalizedLandmark.toRawPoseLandmark() = RawPoseLandmark(
     x = x(),
     y = y(),

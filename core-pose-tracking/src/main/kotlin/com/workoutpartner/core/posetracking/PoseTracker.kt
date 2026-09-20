@@ -19,6 +19,9 @@ interface PoseTracker {
     /** Emits one [PoseTrackingSignal] per analyzed camera frame once [start] has bound a camera. */
     val signals: Flow<PoseTrackingSignal>
 
+    /** Emits every landmark of each analyzed camera frame (`workout-partner-v3` ticket 12's Position Check), including frames with no pose detected (an empty [RawPoseFrame]) — undebounced, unlike [signals]. */
+    val rawFrames: Flow<RawPoseFrame>
+
     /** Emits a message if [start] fails to initialize the pose model or bind the camera (e.g. a missing model asset, or no usable camera on the device). Terminal — no [signals] follow a failed [start]. */
     val errors: Flow<String>
 

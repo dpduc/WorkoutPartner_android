@@ -8,6 +8,12 @@
     <string name="reminder_notification_title">Keep your Streak going</string>
     <string name="reminder_notification_text">You haven\'t logged an Active Day yet this week.</string>
 
+    <!-- Ticket 12: the Position Check's spoken guidance, in string resources
+         so it's translatable later with no code changes (spec.md story 80). -->
+    <string name="position_check_body_detected">Body detected</string>
+    <string name="position_check_step_back">Step back a little</string>
+    <string name="position_check_move_closer">Come a bit closer</string>
+
     <!-- Ticket 10: Form Guide content, bundled per Exercise/Variant (all
          five Exercises plus Step Jack) rather than inline in Compose like
          the rest of this app's copy, per this ticket's own checklist. -->

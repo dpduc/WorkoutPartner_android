@@ -52,19 +52,16 @@ object PoseFrameMapper {
         right: MediaPipePoseLandmark,
         visibilityThreshold: Float,
     ): Point3D? {
-        val leftSample = raw[left]?.takeIf { it.confidence() >= visibilityThreshold }
-        val rightSample = raw[right]?.takeIf { it.confidence() >= visibilityThreshold }
+        val leftSample = raw[left]?.takeIf { it.confidence >= visibilityThreshold }
+        val rightSample = raw[right]?.takeIf { it.confidence >= visibilityThreshold }
 
         val chosen = when {
             leftSample != null && rightSample != null ->
-                if (leftSample.confidence() >= rightSample.confidence()) leftSample else rightSample
+                if (leftSample.confidence >= rightSample.confidence) leftSample else rightSample
             leftSample != null -> leftSample
             rightSample != null -> rightSample
             else -> null
         }
         return chosen?.let { Point3D(it.x, it.y, it.z) }
     }
-
-    /** Visibility and presence both gate how much MediaPipe trusts a landmark; the lower of the two wins. */
-    private fun RawPoseLandmark.confidence(): Float = minOf(visibility ?: 1f, presence ?: 1f)
 }

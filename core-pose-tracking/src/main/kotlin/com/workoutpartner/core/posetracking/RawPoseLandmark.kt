@@ -16,4 +16,7 @@ data class RawPoseLandmark(
     val visibility: Float?,
     /** 0f..1f confidence the landmark is present in frame at all; null if MediaPipe didn't report one. */
     val presence: Float?,
-)
+) {
+    /** Visibility and presence both gate how much MediaPipe trusts a landmark; the lower of the two wins (an unreported score counts as fully confident). */
+    val confidence: Float get() = minOf(visibility ?: 1f, presence ?: 1f)
+}
