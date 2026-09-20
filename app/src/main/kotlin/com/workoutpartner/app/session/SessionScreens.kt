@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,6 +36,7 @@ import com.workoutpartner.app.routines.DifficultyTier
 import com.workoutpartner.data.AccountRepository
 import com.workoutpartner.data.RoutineWithSteps
 import com.workoutpartner.data.SetRepository
+import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.core.repcounting.ExerciseVariant
 
@@ -103,11 +105,18 @@ fun SessionScreen(
     onSessionComplete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val viewModel: SessionViewModel = viewModel(
         factory = remember {
             viewModelFactory {
                 initializer {
-                    SessionViewModel(routine, accountId, setRepository, accountRepository, poseTrackerFactory(), difficultyTier, jumpingJackVariant)
+                    SessionViewModel(
+                        routine, accountId, setRepository, accountRepository, poseTrackerFactory(),
+                        speaker = PromptSpeaker(context),
+                        phrases = ResourceAnnouncerPhrases(context),
+                        difficultyTier = difficultyTier,
+                        jumpingJackVariant = jumpingJackVariant,
+                    )
                 }
             }
         },

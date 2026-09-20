@@ -8,6 +8,19 @@
     <string name="reminder_notification_title">Keep your Streak going</string>
     <string name="reminder_notification_text">You haven\'t logged an Active Day yet this week.</string>
 
+    <!-- Ticket 13: the Session's spoken announcements (SessionAnnouncer). -->
+    <plurals name="announce_set_start">
+        <item quantity="one">%1$s. %2$d rep.</item>
+        <item quantity="other">%1$s. %2$d reps.</item>
+    </plurals>
+    <plurals name="announce_rest">
+        <item quantity="one">Rest %d second.</item>
+        <item quantity="other">Rest %d seconds.</item>
+    </plurals>
+    <string name="announce_get_ready">Get ready. Next: %1$s.</string>
+    <string name="announce_tracking_lost">Tracking lost. Step back into frame.</string>
+    <string name="announce_session_complete">Workout complete.</string>
+
     <!-- Ticket 12: the Position Check's spoken guidance, in string resources
          so it's translatable later with no code changes (spec.md story 80). -->
     <string name="position_check_body_detected">Body detected</string>

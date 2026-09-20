@@ -6,9 +6,9 @@ import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.workoutpartner.app.beforeyoustart.resolveVariant
 import com.workoutpartner.app.routines.DifficultyTier
 import com.workoutpartner.app.routines.RoutineDifficulty
+import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.data.AccountEntity
@@ -45,6 +45,9 @@ class SessionViewModel(
     private val setRepository: SetRepository,
     private val accountRepository: AccountRepository,
     private val poseTracker: PoseTracker,
+    /** Speaks [SessionAnnouncer]'s lines (`workout-partner-v3` ticket 13); shut down in [onCleared], like [toneGenerator]. */
+    private val speaker: PromptSpeaker,
+    phrases: AnnouncerPhrases,
     /** Computed from the Account's (or Guest's) body stats by the caller — see [RoutineDifficulty]. Defaults to [DifficultyTier.STANDARD] (unscaled) when the caller has no profile data yet. */
     private val difficultyTier: DifficultyTier = DifficultyTier.STANDARD,
     /** The Athlete's Overview toggle choice (`workout-partner-v3` ticket 11) — applied to every Jumping Jack step in [routine], for this Session only. `null` leaves them as plain Jumping Jack. */
@@ -52,16 +55,9 @@ class SessionViewModel(
     private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
 
-    private val engine = SessionEngine(
-        routine.steps.map {
-            RoutineStep(
-                exercise = it.exercise,
-                targetReps = RoutineDifficulty.adjustedTargetReps(it.targetReps, difficultyTier),
-                restIntervalSeconds = RoutineDifficulty.adjustedRestIntervalSeconds(it.restIntervalSeconds, difficultyTier),
-                variant = resolveVariant(it.exercise, jumpingJackVariant),
-            )
-        },
-    )
+    private val steps = routine.toRoutineSteps(difficultyTier, jumpingJackVariant)
+    private val engine = SessionEngine(steps)
+    private val announcer = SessionAnnouncer(steps, phrases)
 
     private val _phase = MutableStateFlow(engine.phase)
     val phase: StateFlow<SessionPhase> = _phase.asStateFlow()
@@ -148,7 +144,10 @@ class SessionViewModel(
 
     private fun publishPhase() {
         if (cameraUnavailable) return
-        _phase.value = engine.phase
+        val previous = _phase.value
+        val next = engine.phase
+        _phase.value = next
+        announcer.announce(previous, next).forEach(speaker::speak)
     }
 
     private fun beepIfNewRep() {
@@ -169,6 +168,7 @@ class SessionViewModel(
     override fun onCleared() {
         poseTracker.stop()
         toneGenerator.release()
+        speaker.shutdown()
     }
 
     private companion object {

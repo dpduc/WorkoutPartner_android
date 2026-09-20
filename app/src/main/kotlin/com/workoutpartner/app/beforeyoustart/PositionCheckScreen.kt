@@ -47,7 +47,7 @@ import kotlinx.coroutines.launch
  * speaks whatever [PositionCue]s it emits, and calls [onPhaseChanged] the
  * moment the engine leaves Position Check (auto-advance or "Start anyway").
  *
- * Unlike `SessionScreen`, this owns its tracker, ticker and speaker in the
+ * Unlike `SessionScreen`, this owns its tracker and ticker in the
  * composition (no ViewModel): the whole app's navigation state is plain
  * `remember`, so a ViewModel wouldn't survive a configuration change any
  * better here, and an activity-scoped one wouldn't stop the camera when the
@@ -62,12 +62,13 @@ private const val OUTLINE_STROKE_WIDTH = 6f
 fun PositionCheckScreen(
     engine: BeforeYouStartEngine,
     poseTracker: PoseTracker,
+    /** Speaks the Position Check's cues; owned by [BeforeYouStartScreen] so it outlives this phase (the countdown's first-Set line uses it too). */
+    speaker: PromptSpeaker,
     onPhaseChanged: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val speaker = remember { PromptSpeaker(context) }
     val previewView = remember { PreviewView(context) }
     var phase by remember { mutableStateOf(engine.phase) }
     var cameraError by remember { mutableStateOf<String?>(null) }
@@ -84,7 +85,6 @@ fun PositionCheckScreen(
     DisposableEffect(poseTracker) {
         onDispose {
             poseTracker.stop()
-            speaker.shutdown()
         }
     }
     LaunchedEffect(poseTracker) {

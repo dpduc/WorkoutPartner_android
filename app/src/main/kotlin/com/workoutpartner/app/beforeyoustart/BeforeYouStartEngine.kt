@@ -27,13 +27,14 @@ enum class PositionCue { BODY_DETECTED, STEP_BACK, MOVE_CLOSER }
  * gives [FormGuides] its real payload — the unseen [TrackedExercise]s to
  * show, per [FormGuidePrefs] — since the phase is skipped entirely rather
  * than shown empty; ticket 12 does the same for [PositionCheck] with its live
- * [PositionCheckStatus]. Countdown is still a plain marker, for ticket 13.
+ * [PositionCheckStatus], and ticket 13 for [Countdown] with its seconds
+ * remaining.
  */
 sealed interface BeforeYouStartPhase {
     data object Overview : BeforeYouStartPhase
     data class FormGuides(val guides: List<TrackedExercise>) : BeforeYouStartPhase
     data class PositionCheck(val status: PositionCheckStatus) : BeforeYouStartPhase
-    data object Countdown : BeforeYouStartPhase
+    data class Countdown(val secondsRemaining: Int) : BeforeYouStartPhase
     data object Ready : BeforeYouStartPhase
 }
 
@@ -54,7 +55,8 @@ sealed interface BeforeYouStartPhase {
  * of every check passing while standing still — or [startAnyway] once
  * [START_ANYWAY_AFTER_SECONDS] have passed, for an imperfect setup. Spoken
  * guidance is emitted as [PositionCue]s for the caller to [takeCue] and
- * speak. Countdown still advances unconditionally (ticket 13).
+ * speak. The Countdown (ticket 13) then counts [COUNTDOWN_SECONDS] ticks down
+ * to Ready — the caller starts the Session's first Set straight away, no tap.
  */
 class BeforeYouStartEngine(private val unseenGuides: List<TrackedExercise>) {
     var phase: BeforeYouStartPhase = BeforeYouStartPhase.Overview
@@ -80,8 +82,8 @@ class BeforeYouStartEngine(private val unseenGuides: List<TrackedExercise>) {
             BeforeYouStartPhase.Overview ->
                 if (unseenGuides.isEmpty()) initialPositionCheck() else BeforeYouStartPhase.FormGuides(unseenGuides)
             is BeforeYouStartPhase.FormGuides -> initialPositionCheck()
-            is BeforeYouStartPhase.PositionCheck -> BeforeYouStartPhase.Countdown
-            BeforeYouStartPhase.Countdown -> BeforeYouStartPhase.Ready
+            is BeforeYouStartPhase.PositionCheck -> BeforeYouStartPhase.Countdown(COUNTDOWN_SECONDS)
+            is BeforeYouStartPhase.Countdown -> BeforeYouStartPhase.Ready
             BeforeYouStartPhase.Ready -> BeforeYouStartPhase.Ready
         }
     }
@@ -115,8 +117,12 @@ class BeforeYouStartEngine(private val unseenGuides: List<TrackedExercise>) {
         publishPositionCheck()
     }
 
-    /** One second passed; ignored outside [BeforeYouStartPhase.PositionCheck]. */
+    /** One second passed; counts down [BeforeYouStartPhase.Countdown] and drives [BeforeYouStartPhase.PositionCheck]'s timers, ignored in every other phase. */
     fun onTick() {
+        (phase as? BeforeYouStartPhase.Countdown)?.let { countdown ->
+            phase = if (countdown.secondsRemaining <= 1) BeforeYouStartPhase.Ready else BeforeYouStartPhase.Countdown(countdown.secondsRemaining - 1)
+            return
+        }
         if (phase !is BeforeYouStartPhase.PositionCheck) return
         secondsElapsed++
 
@@ -148,9 +154,8 @@ class BeforeYouStartEngine(private val unseenGuides: List<TrackedExercise>) {
     fun takeCue(): PositionCue? = cues.removeFirstOrNull()
 
     /**
-     * Advances through every remaining phase in one call. A placeholder for
-     * ticket 13 to replace with the Athlete actually watching the countdown
-     * instead of skipping straight through.
+     * Advances through every remaining phase in one call, skipping the
+     * Position Check and Countdown a real run would spend time in.
      */
     fun skipToReady() {
         while (phase != BeforeYouStartPhase.Ready) advance()
@@ -177,6 +182,9 @@ class BeforeYouStartEngine(private val unseenGuides: List<TrackedExercise>) {
     }
 
     companion object {
+        /** Seconds of the huge-digit countdown between the Position Check and the first Set (spec.md story 67). */
+        const val COUNTDOWN_SECONDS = 10
+
         /** Seconds of every check passing while standing still before the Position Check auto-advances (spec.md story 64). */
         const val REQUIRED_STABLE_SECONDS = 2
 

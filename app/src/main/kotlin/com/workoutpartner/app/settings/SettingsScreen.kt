@@ -24,11 +24,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.workoutpartner.app.speech.SpeechPrefs
 import com.workoutpartner.app.ui.components.ActivityLevelPicker
 import com.workoutpartner.data.AccountRepository
 import com.workoutpartner.data.ActivityLevel
@@ -62,10 +64,15 @@ fun SettingsScreen(
     onViewProgress: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val viewModel: SettingsViewModel = viewModel(
         factory = remember { viewModelFactory { initializer { SettingsViewModel(accountId, accountRepository, authRepository) } } },
     )
     val state by viewModel.uiState.collectAsState()
+
+    // Device-local, not Account data (`workout-partner-v3` ticket 13) — same for a Guest and an Account holder.
+    val speechPrefs = remember { SpeechPrefs(context) }
+    var spokenPromptsEnabled by remember { mutableStateOf(speechPrefs.spokenPromptsEnabled) }
 
     var name by remember { mutableStateOf("") }
     var ageInput by remember { mutableStateOf("") }
@@ -147,6 +154,22 @@ fun SettingsScreen(
                 ) {
                     Text("Daily reminder")
                     Switch(checked = state.notificationsEnabled, onCheckedChange = viewModel::setNotificationsEnabled)
+                }
+            }
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Spoken prompts")
+                    Switch(
+                        checked = spokenPromptsEnabled,
+                        onCheckedChange = {
+                            spokenPromptsEnabled = it
+                            speechPrefs.spokenPromptsEnabled = it
+                        },
+                    )
                 }
             }
             Button(onClick = onViewProgress, modifier = Modifier.fillMaxWidth()) { Text("Weekly Target & Progress") }

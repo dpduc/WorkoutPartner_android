@@ -50,7 +50,7 @@ class BeforeYouStartEngineTest {
         assertTrue(engine.phase is BeforeYouStartPhase.PositionCheck)
 
         engine.advance()
-        assertEquals(BeforeYouStartPhase.Countdown, engine.phase)
+        assertEquals(BeforeYouStartPhase.Countdown(BeforeYouStartEngine.COUNTDOWN_SECONDS), engine.phase)
 
         engine.advance()
         assertEquals(BeforeYouStartPhase.Ready, engine.phase)
@@ -173,7 +173,7 @@ class BeforeYouStartEngineTest {
         engine.onPoseFrame(goodFrame())
         engine.onTick()
 
-        assertEquals(BeforeYouStartPhase.Countdown, engine.phase)
+        assertEquals(BeforeYouStartPhase.Countdown(BeforeYouStartEngine.COUNTDOWN_SECONDS), engine.phase)
     }
 
     @Test
@@ -191,7 +191,7 @@ class BeforeYouStartEngineTest {
         engine.onPoseFrame(goodFrame(xOffset = 0.2f))
         engine.onTick()
 
-        assertEquals(BeforeYouStartPhase.Countdown, engine.phase)
+        assertEquals(BeforeYouStartPhase.Countdown(BeforeYouStartEngine.COUNTDOWN_SECONDS), engine.phase)
     }
 
     @Test
@@ -238,7 +238,7 @@ class BeforeYouStartEngineTest {
 
         engine.startAnyway()
 
-        assertEquals(BeforeYouStartPhase.Countdown, engine.phase)
+        assertEquals(BeforeYouStartPhase.Countdown(BeforeYouStartEngine.COUNTDOWN_SECONDS), engine.phase)
     }
 
     @Test
@@ -325,7 +325,7 @@ class BeforeYouStartEngineTest {
         engine.onPoseFrame(goodFrame(xOffset = 0.025f))
         engine.onTick()
 
-        assertEquals(BeforeYouStartPhase.Countdown, engine.phase)
+        assertEquals(BeforeYouStartPhase.Countdown(BeforeYouStartEngine.COUNTDOWN_SECONDS), engine.phase)
     }
 
     @Test
@@ -365,6 +365,46 @@ class BeforeYouStartEngineTest {
         engine.onPoseFrame(frame(topY = 0.3f, bottomY = 0.69f)) // back in, still too far
 
         assertNull(engine.takeCue())
+    }
+
+    // --- Countdown (workout-partner-v3 ticket 13) ---
+
+    @Test
+    fun `Countdown starts at 10 seconds`() {
+        val engine = enginePastFormGuides()
+        engine.startPastPositionCheck()
+
+        assertEquals(BeforeYouStartPhase.Countdown(10), engine.phase)
+    }
+
+    @Test
+    fun `Countdown reaches Ready after 10 ticks, not before`() {
+        val engine = enginePastFormGuides()
+        engine.startPastPositionCheck()
+
+        repeat(9) { engine.onTick() }
+        assertEquals(BeforeYouStartPhase.Countdown(1), engine.phase)
+
+        engine.onTick()
+
+        assertEquals(BeforeYouStartPhase.Ready, engine.phase)
+    }
+
+    @Test
+    fun `ticks after Ready change nothing`() {
+        val engine = enginePastFormGuides()
+        engine.startPastPositionCheck()
+        repeat(10) { engine.onTick() }
+
+        engine.onTick()
+
+        assertEquals(BeforeYouStartPhase.Ready, engine.phase)
+    }
+
+    /** Position Check -> Countdown the way "Start anyway" gets there: after its 15 seconds. */
+    private fun BeforeYouStartEngine.startPastPositionCheck() {
+        repeat(15) { onTick() }
+        startAnyway()
     }
 
     private fun enginePastFormGuides() = BeforeYouStartEngine(unseenGuides = emptyList()).also { it.advance() }

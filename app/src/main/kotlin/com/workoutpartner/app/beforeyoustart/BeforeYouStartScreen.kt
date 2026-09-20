@@ -1,29 +1,38 @@
 package com.workoutpartner.app.beforeyoustart
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import com.workoutpartner.app.routines.DifficultyTier
+import com.workoutpartner.app.session.ResourceAnnouncerPhrases
+import com.workoutpartner.app.session.SessionAnnouncer
+import com.workoutpartner.app.session.toRoutineSteps
+import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.app.ui.components.CameraPermissionGate
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.data.RoutineWithSteps
+import kotlinx.coroutines.delay
 
 /**
  * Owns the [BeforeYouStartEngine] for one chosen Routine and renders
  * whichever phase it's on (`workout-partner-v3` ticket 03's phase skeleton,
- * ticket 10's Form Guides, ticket 12's Position Check). [onReadyForSession]
- * fires once the flow reaches a phase with no real UI yet — currently
- * [BeforeYouStartPhase.Countdown] — the same "proceed straight into the
- * Session" placeholder ticket 03 used for the whole flow, now pushed to the
- * last phase; ticket 13 replaces it once the countdown has something to
- * show. It carries the Athlete's chosen Jumping Jack/Step Jack Variant
- * (ticket 11) along for the ride, so [onReadyForSession] can hand it to the
- * Session that's about to start.
+ * ticket 10's Form Guides, ticket 12's Position Check, ticket 13's
+ * Countdown). [onReadyForSession] fires once the countdown reaches
+ * [BeforeYouStartPhase.Ready], straight into the first Set with no tap. It
+ * carries the Athlete's chosen Jumping Jack/Step Jack Variant (ticket 11)
+ * along for the ride, so [onReadyForSession] can hand it to the Session
+ * that's about to start.
+ *
+ * Owns the [PromptSpeaker] for the whole flow: the Position Check's cues and
+ * the countdown's first-Set line ("Squat. 12 reps.") share it, and it must
+ * outlive the Position Check phase that would otherwise cut that line off.
  *
  * "Review form" is deliberately *not* routed through the engine: the
  * ticket asks for it to reopen every guide "anytime," regardless of the
@@ -58,6 +67,9 @@ fun BeforeYouStartScreen(
     var reviewingAllGuides by remember { mutableStateOf(false) }
     var engine by remember { mutableStateOf<BeforeYouStartEngine?>(null) }
     var phase by remember { mutableStateOf<BeforeYouStartPhase>(BeforeYouStartPhase.Overview) }
+    val context = LocalContext.current
+    val speaker = remember { PromptSpeaker(context) }
+    DisposableEffect(speaker) { onDispose { speaker.shutdown() } }
 
     val currentPhase = phase
 
@@ -88,6 +100,7 @@ fun BeforeYouStartScreen(
                     PositionCheckScreen(
                         engine = activeEngine,
                         poseTracker = remember { poseTrackerFactory() },
+                        speaker = speaker,
                         onPhaseChanged = { phase = activeEngine.phase },
                         modifier = modifier,
                     )
@@ -95,8 +108,26 @@ fun BeforeYouStartScreen(
             }
         }
 
-        currentPhase == BeforeYouStartPhase.Countdown || currentPhase == BeforeYouStartPhase.Ready ->
-            LaunchedEffect(Unit) { onReadyForSession(jumpingJackVariant) }
+        currentPhase is BeforeYouStartPhase.Countdown -> {
+            LaunchedEffect(Unit) {
+                // The first Set's line is spoken as the countdown starts; later Sets' come from SessionAnnouncer's transitions.
+                val steps = routine.toRoutineSteps(difficultyTier, jumpingJackVariant)
+                val line = SessionAnnouncer(steps, ResourceAnnouncerPhrases(context)).setStart(steps.first())
+                speaker.speak(line)
+            }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(1000)
+                    engine?.let {
+                        it.onTick()
+                        phase = it.phase
+                    }
+                }
+            }
+            CountdownScreen(secondsRemaining = currentPhase.secondsRemaining, modifier = modifier)
+        }
+
+        currentPhase == BeforeYouStartPhase.Ready -> LaunchedEffect(Unit) { onReadyForSession(jumpingJackVariant) }
 
         else -> WorkoutOverviewScreen(
             routine = routine,
