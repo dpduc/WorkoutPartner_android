@@ -1,5 +1,15 @@
 # Hệ Thống "Before You Start" — Màn Hình Chuẩn Bị Trước Bài Tập
 
+> **Status (2026-09-21): design source, partly superseded.** `workout-partner-v3` (`.scratch/workout-partner-v3/spec.md`) took this document as input and made its own decisions; where they differ, the spec and `CONTEXT.md` win. Differences:
+> - **Position Check** (what this document calls Camera Setup): no lighting check, no raise-hand gesture and no voice command — the countdown starts automatically once the body is in frame, the distance is right and the Athlete has held still for 2 s; "Start anyway" appears after 15 s.
+> - **Skipping guides:** no "seen 3 times" rule. Form Guides are shown once per Exercise/Variant until seen and are always reviewable from the Overview.
+> - **Rounds:** Routines have no rounds ([ADR-0008](adr/0008-ten-routine-catalogue-and-separate-amrap-mode.md)), so "Round 2/3" and "↻ 3 Rounds" do not appear.
+> - **Guided Warm-Up (Phase 4)**, per-rep and form-warning audio, haptics, colour-coded borders, animated guides and Vietnamese speech are out of scope for v3 (spec, "Out of Scope"). The 10-second countdown that announces the first Exercise replaces Phase 4.
+> - **Thresholds:** Jumping Jack good form is now ≥ 125°; Step Jack has its own thresholds (rep ≥ 75°, form ≥ 110°) instead of Jumping Jack's.
+> - **Vocabulary:** this document says "Workout", "Camera Setup" and "Exercise Guide Card"; `CONTEXT.md` calls them Session/Routine, Position Check and Form Guide.
+>
+> The implementation checklist at the end shows what shipped.
+
 ## Tổng Quan
 
 Tài liệu này thiết kế luồng UX **"Before You Start"** — một chuỗi màn hình chuẩn bị hiển thị **trước khi** người dùng bắt đầu bất kỳ bài tập nào (Structured Routine hoặc AMRAP). Hệ thống giải quyết 3 vấn đề:
@@ -340,7 +350,7 @@ Mỗi bài tập trong routine sẽ có **1 card** hướng dẫn. User swipe ng
 | Tiêu chí | Ngưỡng |
 | :--- | :--- |
 | Rep được đếm | Góc khuỷu-vai-hông $\ge 90°$ |
-| Good Form | Góc khuỷu-vai-hông $\ge 150°$ (tay qua đầu) |
+| Good Form | Góc khuỷu-vai-hông $\ge 125°$ (tay lên gần/qua đầu; ban đầu 150°, hạ xuống theo dữ liệu thực tế) |
 
 **Lỗi phổ biến & cách khắc phục:**
 | Lỗi | Biểu hiện | Khắc phục |
@@ -354,7 +364,7 @@ Mỗi bài tập trong routine sẽ có **1 card** hướng dẫn. User swipe ng
 **Biến thể Low-Impact — STEP JACK:** Dành cho BMI $\ge 30$ hoặc người hạn chế khớp:
 - Thay bật nhảy bằng bước chân sang mỗi bên.
 - Tay vẫn giơ qua đầu (biên độ đầy đủ).
-- AI vẫn kiểm tra cùng ngưỡng góc vai.
+- AI kiểm tra góc vai với ngưỡng riêng của Step Jack: đếm rep ở $\ge 75°$, Good Form ở $\ge 110°$ (là một Exercise Variant, có Personal Best riêng).
 
 **Animation mô tả:** Loop GIF/Lottie nhìn chính diện, hiển thị:
 - Biên độ tay (highlight vùng vai khi tay ở đỉnh)
@@ -727,12 +737,12 @@ data class BeforeYouStartPrefs(
 
 ### MVP (Version 1.0):
 
-- [ ] **Phase 1 — Workout Overview:** Hiển thị tổng quan + danh sách bài tập
-- [ ] **Phase 2 — Exercise Guide Cards:** Swipeable cards với hình ảnh tĩnh (PNG placeholder) + text hướng dẫn form
-- [ ] **Phase 3 — Camera Setup:** Checklist tự động (body detection + khoảng cách)
-- [ ] **Phase 4 — Countdown:** Auto-countdown 10 giây + TTS đọc tên bài tập đầu tiên
-- [ ] **Audio trong tập:** TTS đọc tên bài tập + "Nghỉ X giây" + "Hoàn thành"
-- [ ] **Distance-Friendly UI:** Số rep font 120sp, tên bài 48sp, progress bar lớn
+- [x] **Phase 1 — Workout Overview:** Hiển thị tổng quan + danh sách bài tập
+- [x] **Phase 2 — Exercise Guide Cards:** Swipeable cards với hình ảnh tĩnh (PNG placeholder) + text hướng dẫn form
+- [x] **Phase 3 — Camera Setup:** Checklist tự động (body detection + khoảng cách)
+- [x] **Phase 4 — Countdown:** Auto-countdown 10 giây + TTS đọc tên bài tập đầu tiên
+- [x] **Audio trong tập:** TTS đọc tên bài tập + "Nghỉ X giây" + "Hoàn thành"
+- [x] **Distance-Friendly UI:** Số rep font 120sp, tên bài 48sp, progress bar lớn
 
 ### Version 1.1:
 

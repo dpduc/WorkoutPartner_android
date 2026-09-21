@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 02 — Rep Counting Engine (Seam 1)
 

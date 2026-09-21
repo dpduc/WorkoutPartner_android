@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 (schema — the `exerciseVariant` column Sets/Tallies persist to).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] A new `ExerciseVariant` concept in `core-rep-counting`, with `STEP_JACK` as its only value, parented to `JUMPING_JACK`.
 - [x] `ExerciseProfiles` and `RepCounter` resolve a profile by Exercise plus optional Variant (extending the current Exercise-only key). Step Jack uses the same elbow–shoulder–hip joints and increasing direction as Jumping Jack, with `repThresholdDegrees = 75` and `formThresholdDegrees = 135`.
@@ -28,3 +28,6 @@ Caught in review (Standards axis) and fixed before commit: `ProgressStats.person
 No UI entry point for choosing Step Jack was added, per this ticket's own scope line — every real Routine step still resolves `variant = null` until ticket 11 wires one in.
 
 Reviewed via `/code-review` (Standards + Spec axes) before commit; the fix above came from that review.
+
+
+> **Update 2026-09-21:** the 135° Step Jack form threshold above was lowered to **110°** (and Jumping Jack's from 150° to 125°) after tuning against real footage; the tests now mention those values. See `ExerciseProfiles.kt`.

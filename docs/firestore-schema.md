@@ -27,12 +27,15 @@ as `SetEntity.id` (Room). Immutable once written — never updated or deleted.
 | `formScore` | int | 0-100. |
 | `goodSet` | bool | Both conditions per CONTEXT.md's Good Set definition. |
 | `timestamp` | timestamp | |
-| `exerciseVariant` | string or null | `workout-partner-v3` ticket 02: null for `exercise`'s standard form, the Exercise Variant's name (e.g. `"STEP_JACK"`) otherwise. Schema/rules only for now — `SetEntity.toFirestoreMap()` doesn't populate this yet; that's ticket 08's job once Step Jack Sets actually exist. |
+| `exerciseVariant` | string or null | `workout-partner-v3` ticket 02: null for `exercise`'s standard form, the Exercise Variant's name (e.g. `"STEP_JACK"`) otherwise. Schema/rules only for now — neither `SetEntity.toFirestoreMap()` nor `TallyEntity.toFirestoreMap()` sends it yet, although Step Jack Sets now exist (`workout-partner-v3` ticket 08), so a synced Step Jack Set currently arrives without its variant. Fixed together with the push path in [ADR-0010](adr/0010-android-owner-writes-with-field-limits.md). |
 
 ## `tallies/{tallyId}`
 
 One Quick Count run's Tally (CONTEXT.md). `{tallyId}` matches `TallyEntity.id`.
-Immutable once written. Never carries a Form Score.
+Immutable once written. Carries the run's average Form Score and duration
+(`workout-partner-v2` ticket 03 reversed the earlier "never carries a Form
+Score" decision — see CONTEXT.md's Form Score and Tally entries); both are
+nullable for a Tally recorded before that ticket landed.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -43,6 +46,8 @@ Immutable once written. Never carries a Form Score.
 | `repsAchieved` | int | |
 | `target` | int or null | Optional (spec.md story 36). |
 | `timestamp` | timestamp | |
+| `formScore` | int or null | Average Form Score of the run, 0-100. |
+| `durationSeconds` | int or null | Total time of the run. |
 | `exerciseVariant` | string or null | `workout-partner-v3` ticket 02 — same meaning and same "schema/rules only for now" caveat as `sets.exerciseVariant` above. |
 
 **Not yet implemented — schema defined ahead of the write path, a disclosed
@@ -55,11 +60,17 @@ just as easily let a Web session signed in as that Account rewrite its own
 Account state, which ADR-0006 rules out; there's no platform-distinguishing
 mechanism available to narrow that further (see `firestore.rules`' own
 comment block). A later ticket needs both the real write path and an
-answer to that before these can accept writes:**
+answer to that before these can accept writes. That answer is now decided:
+[ADR-0010](adr/0010-android-owner-writes-with-field-limits.md) lets the owner
+write them with field limits (and treats ADR-0006's "Web is read-only" as a
+scope rule, not a rules-enforced one), shipping together with the push path.
+Streak/Shield ownership is settled by
+[ADR-0009](adr/0009-streak-computed-on-device-cloud-authority-later.md).**
 
 ## `accounts/{accountId}`
 
-Mirrors `AccountEntity`. `{accountId}` is the Firebase Auth uid.
+Mirrors `AccountEntity`. `{accountId}` is the Firebase Auth uid. The body-stats
+fields are nullable because an Account may not have answered onboarding.
 
 | Field | Type |
 |---|---|
@@ -67,6 +78,11 @@ Mirrors `AccountEntity`. `{accountId}` is the Firebase Auth uid.
 | `bankedShields` | int |
 | `currentStreak` | int |
 | `notificationsEnabled` | bool |
+| `name` | string or null |
+| `age` | int or null |
+| `heightCm` | int or null |
+| `weightKg` | number or null |
+| `activityLevel` | string or null — `SEDENTARY`, `LIGHTLY_ACTIVE`, `ACTIVE` or `VERY_ACTIVE` |
 
 ## `sessions/{sessionId}`
 

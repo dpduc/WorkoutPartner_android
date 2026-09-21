@@ -217,6 +217,7 @@ sign-in silently claims any Guest data on the device.
 
 - A new `ExerciseVariant` concept in `core-rep-counting`, with `STEP_JACK` as its only value, parented to `JUMPING_JACK`.
 - `ExerciseProfiles` and `RepCounter` resolve a profile by Exercise plus optional Variant. Step Jack uses the same elbow–shoulder–hip joints and increasing direction as Jumping Jack, with `repThresholdDegrees = 75` and `formThresholdDegrees = 135` (placeholders, same spirit as the existing thresholds).
+  - *Update 2026-09-21:* real footage showed smoothed Jumping Jack arm peaks of 130–137°, so no rep could reach the 150° form bar. As shipped in `ExerciseProfiles.kt`: Jumping Jack rep 90° / form **125°**; Step Jack rep 75° / form **110°** (kept below Jumping Jack's, as the easier movement). Still placeholders.
 - `RoutineStep`/`CompletedSet` carry the optional Variant; the Session's Good Set judgement uses the Variant's threshold.
 - Suggestion rule: when BMI ≥ 30, Jumping Jack steps in the chosen Routine default to Step Jack on the Workout Overview; the Athlete can toggle it for the whole Session. The choice is not persisted between Sessions.
 - `ProgressStats.personalBests` keys Personal Bests by Exercise + Variant.

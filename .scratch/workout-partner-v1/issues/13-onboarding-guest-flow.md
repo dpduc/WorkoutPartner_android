@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 13 — Onboarding, safety disclaimer & Guest flow UI
 

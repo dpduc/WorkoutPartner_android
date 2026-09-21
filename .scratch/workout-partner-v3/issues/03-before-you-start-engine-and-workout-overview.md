@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] `BeforeYouStartEngine` models the full phase sequence (Overview → Form Guides → Position Check → Countdown → Ready) even though only Overview is wired to real UI yet; later tickets fill in the rest without re-architecting the engine.
 - [x] Overview shows: Routine name, estimated duration, difficulty tier, and each Exercise with its difficulty-adjusted rep target (reusing `RoutineDifficulty`).

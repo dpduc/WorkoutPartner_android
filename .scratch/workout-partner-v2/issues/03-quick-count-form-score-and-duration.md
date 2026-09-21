@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 03 — Quick Count: average form score + duration
 

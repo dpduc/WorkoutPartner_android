@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 15 — Local Auth Fallback (LocalAuthGateway)
 

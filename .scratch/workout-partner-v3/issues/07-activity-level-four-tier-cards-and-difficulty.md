@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 (schema — the `ActivityLevel` enum and value remap land there).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Profile setup shows four cards: Sedentary ("I rarely exercise"), Lightly Active ("a few times a week"), Active ("frequently active"), Very Active ("working out is my daily passion").
 - [x] Settings offers the same four options to change Activity Level later.

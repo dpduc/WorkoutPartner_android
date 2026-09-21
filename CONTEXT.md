@@ -49,8 +49,12 @@ _Avoid_: Accuracy, Quality score
 ### Self-tracking (Routines)
 
 **Routine**:
-A fixed, bundled, flat sequence of target Exercises, rep targets, and rest intervals. Authored into the app; not user-editable. Has no notion of repeated rounds (yet).
-_Avoid_: Program, Workout plan, Round (not a modelled concept)
+A fixed, bundled, flat sequence of target Exercises, rep targets, and rest intervals. Authored into the app; not user-editable. Has no notion of repeated rounds — a multi-round plan is authored as a longer flat sequence. The bundled catalogue is 10 Routines (see ADR-0008).
+_Avoid_: Program, Workout plan, Round (only modelled inside an AMRAP)
+
+**AMRAP**:
+A timed benchmark, separate from a Routine: the Athlete cycles a fixed circuit of Exercises for as many Rounds as possible within a time cap, resting when they choose. Scored `complete Rounds × reps per Round + extra reps`; Form Score is tracked but does not change the score, and a Rep below the Exercise's rep threshold is not counted. Its blocks are recorded as Sets. Not yet built (ADR-0008).
+_Avoid_: Challenge, Test (in code and data; fine in prose)
 
 **Before You Start**:
 The preparation flow an Athlete goes through between picking a Routine and its first Set: a Workout Overview, Form Guides for any Exercises they haven't seen, a Position Check, then a countdown into the Session.

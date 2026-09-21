@@ -26,3 +26,7 @@ up. File as `needs-triage` until scoped.
 
 `02-routine-difficulty-and-format-tags.md` (format tagging ships first,
 without this).
+
+## Comments
+
+- 2026-09-21: [ADR-0008](../../../docs/adr/0008-ten-routine-catalogue-and-separate-amrap-mode.md) takes AMRAP out of this ticket: AMRAP becomes its own timed mode (rounds, no programmed rest, scored `rounds x reps + extra`) and stops being a `RoutineFormat` tag. What remains here is the HIIT/Tabata work/rest interval timer. Still `needs-triage`.

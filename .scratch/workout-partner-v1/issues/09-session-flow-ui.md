@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 09 — Self-tracking Session flow UI
 

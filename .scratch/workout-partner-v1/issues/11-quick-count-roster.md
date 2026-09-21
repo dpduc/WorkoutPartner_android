@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 11 — Quick Count / Roster
 

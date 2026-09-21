@@ -9,11 +9,19 @@ This document defines the roadmap, technical strategy, and implementation steps 
 > anymore: `AppContainer.authGateway` falls back to `LocalAuthGateway`
 > whenever constructing `FirebaseAuthGateway` fails (no
 > `google-services.json`/plugin applied), so Sign Up/Sign In always render.
-> The only remaining gap is Phase 3.1's last checklist item — actually
-> applying the `com.google.gms.google-services` Gradle plugin and enabling
-> Email/Password in a real Firebase console — which is the app owner's own
+> The `com.google.gms.google-services` plugin is now applied in
+> `app/build.gradle.kts` (`workout-partner-v3` ticket 01), and Google
+> sign-in exists alongside email; phone/SMS sign-in was removed. The only
+> remaining gap is Phase 3.1's last item — enabling the Email/Password (and
+> Google) providers in a real Firebase console — which is the app owner's own
 > manual step (needs their own Firebase project credentials), not something
 > an agent can do unattended.
+>
+> **Also updated since:** sign-in never claims Guest data on its own any more —
+> it reports pending data for the Athlete to merge or discard
+> ([ADR-0007](adr/0007-guest-feature-parity-stays-local.md)). Where this
+> document's Phase 2 and its test list describe the older single-path claim
+> hook, the code and `workout-partner-v3` tickets 05/09 are the source of truth.
 
 ---
 
@@ -59,9 +67,9 @@ timeline
         Claim unowned Sessions & Sets : Migrate accountId == null
         Retroactive Streak calculation : Replay history through StreakCalculator
     section Phase 3 (◐ Partially shipped, ticket 14) : Firebase Provisioning
-        Dev google-services.json in place : Plugin still not applied in app/build.gradle.kts
-        Enable FirebaseAuthGateway : Production cloud auth
-        OAuth Extension Hooks : Google Sign-In / Credential Manager
+        Dev google-services.json in place : Plugin applied in app/build.gradle.kts
+        Enable FirebaseAuthGateway : Needs Email/Password + Google providers enabled in the console
+        OAuth Extension Hooks : Google Sign-In / Credential Manager (shipped)
     section Phase 4 (✅ Shipped, ticket 06) : Sync & Reconnection
         Flush PendingSync outbox : Push local sets to Firestore
         Conflict & Re-authentication : Handle token refresh & offline reconnects
@@ -141,15 +149,8 @@ When a Guest calls `authRepository.signUp()`:
 - [x] Create a Firebase Project in the Firebase Console — a dev project (`workout-partner-2455c`) already exists.
 - [x] Register Android app with package name `com.workoutpartner.app` — confirmed in the local `google-services.json`.
 - [x] `google-services.json` already exists at `app/google-services.json` for local/dev use (gitignored per `.gitignore:31` — each developer/environment provisions their own; a separate prod project still needs the same steps repeated).
-- [ ] **In `app/build.gradle.kts`, apply the plugin** — still the one actually-blocking step; it's deliberately commented out today (see the file's own doc comment) precisely because this had not landed yet:
-  ```kotlin
-  plugins {
-      alias(libs.plugins.android.application)
-      alias(libs.plugins.kotlin.compose)
-      id("com.google.gms.google-services") // Activate
-  }
-  ```
-- [ ] Enable **Email/Password** authentication provider in Firebase Console > Authentication > Sign-in method.
+- [x] **In `app/build.gradle.kts`, apply the plugin** — done (`alias(libs.plugins.google.services)`), alongside the Credential Manager / Google ID dependencies.
+- [ ] Enable the **Email/Password** and **Google** authentication providers in Firebase Console > Authentication > Sign-in method (owner's manual step).
 
 #### 3.2 Error Handling & User Feedback
 Map Firebase Auth exceptions to user-friendly messages on UI:
@@ -159,13 +160,13 @@ Map Firebase Auth exceptions to user-friendly messages on UI:
 * `FirebaseNetworkException` &rarr; "Network error. You can continue offline in Local Mode."
 
 #### 3.3 Extensibility for Social Logins
-The `AuthGateway` interface can be extended cleanly without breaking existing callers:
+The `AuthGateway` interface was extended this way (shipped). It takes the Google ID token rather than an `Activity`, so the data module carries no Android UI types; `LocalAuthGateway.signInWithGoogle` throws a typed "unavailable in local mode" error:
 ```kotlin
 interface AuthGateway {
     val currentUserId: Flow<String?>
     suspend fun signUpWithEmail(email: String, password: String): String
     suspend fun signInWithEmail(email: String, password: String): String
-    suspend fun signInWithGoogle(idToken: String): String // Future addition
+    suspend fun signInWithGoogle(idToken: String): String
     suspend fun signOut()
 }
 ```

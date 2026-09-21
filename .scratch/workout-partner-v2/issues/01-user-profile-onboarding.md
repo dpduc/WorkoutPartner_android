@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 01 — User profile onboarding (name, age, height, weight, activity level)
 

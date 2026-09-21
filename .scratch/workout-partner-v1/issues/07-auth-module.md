@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 07 — Auth module
 

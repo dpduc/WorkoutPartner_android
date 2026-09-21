@@ -1,5 +1,12 @@
 # Hệ Thống Bài Tập Tích Hợp Pose Estimation Theo BMI & Thể Lực
 
+> **Status (2026-09-21):** content specification for a **roadmap**, not a description of what ships. Today the app bundles 3 Routines (`BundledRoutines.kt`) and "AMRAP" is only a display tag. [ADR-0008](adr/0008-ten-routine-catalogue-and-separate-amrap-mode.md) adopts the 10 Routines below as the bundled catalogue and AMRAP as a separate timed mode, with these adjustments to this document:
+> - Rounds are unrolled into flat steps (Routines have no rounds; only an AMRAP does).
+> - Per-Routine angles (Half Squat 120°, Deep Squat ≤ 95°, incline Push-up ≤ 110°) are **not** adopted; every Routine uses the standard Exercise thresholds, and those variations are coaching text.
+> - Routine steps store Jumping Jack; Step Jack comes from the Workout Overview switch (default at BMI ≥ 30), not from being written into RT-01/RT-02/AM-01.
+> - The BMI bands and the "recommended" pinning are advisory metadata; they are not built.
+> - **Angle thresholds** in the table below match `ExerciseProfiles.kt` except Jumping Jack, whose good-form threshold is now **125°** (rep threshold 90°) after tuning against real footage, and Step Jack (variant: rep 75°, form 110°). The code is the source of truth.
+
 Tài liệu này nghiên cứu cơ sở động học, phân tích khả năng nhận diện chuyển động bằng thị giác máy tính (**Google MediaPipe Pose Landmarker**), và thiết kế hệ sinh thái bài tập được cá nhân hóa theo **Chỉ số khối cơ thể (BMI)** và **Mức độ vận động (Activity Level)** cho ứng dụng **Workout Partner**.
 
 Hệ thống bài tập chia thành **2 loại chính**:
@@ -41,7 +48,7 @@ Hệ thống theo dõi sử dụng mô hình **MediaPipe Pose 33 3D Landmarks** 
 | **PUSH-UP** | **Vai – Khuỷu tay – Cổ tay** | `DECREASING` (Giảm dần) | $\le 130^\circ$ | $\le 90^\circ$ (Ngực gần chạm sàn) | Góc nghiêng $45^\circ$ ngang thân | Chưa hạ đủ sâu, võng lưng (Hông tụt), chổng mông |
 | **SIT-UP** | **Vai – Hông – Đầu gối** | `DECREASING` (Giảm dần) | $\le 130^\circ$ | $\le 70^\circ$ (Thân trên dựng đứng) | Góc nghiêng ngang $90^\circ$ hoặc $45^\circ$ | Dùng đà cổ, giật lưng, không nâng lưng khỏi mặt sàn |
 | **LUNGE** | **Hông – Đầu gối trước – Cổ chân** | `DECREASING` (Giảm dần) | $\le 130^\circ$ | $\le 100^\circ$ (Gối trước vuông góc) | Góc chéo $45^\circ$ | Gối trước vượt quá mũi chân, thân trên đổ về trước |
-| **JUMPING JACK** | **Khuỷu tay – Vai – Hông** | `INCREASING` (Tăng dần) | $\ge 90^\circ$ | $\ge 150^\circ$ (Tay chạm qua đầu) | Góc chính diện $0^\circ$ | Tay giơ nửa vời, chân không mở rộng đủ nhịp |
+| **JUMPING JACK** | **Khuỷu tay – Vai – Hông** | `INCREASING` (Tăng dần) | $\ge 90^\circ$ | $\ge 125^\circ$ (Tay lên gần/qua đầu; ban đầu đặt 150°, hạ xuống theo dữ liệu thực tế) | Góc chính diện $0^\circ$ | Tay giơ nửa vời, chân không mở rộng đủ nhịp |
 
 ---
 

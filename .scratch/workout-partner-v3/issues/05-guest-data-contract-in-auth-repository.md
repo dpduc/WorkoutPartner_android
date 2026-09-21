@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (auth cleanup lands first so this doesn't fight phone-auth code being deleted at the same time), 02 (schema).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] `hasUnclaimedGuestData` counts any unowned Session, any unowned Tracked Profile, or a Guest record carrying non-default state — not Sessions only.
 - [x] **Sign-up** (email) claims: unowned Sessions, unowned Tracked Profiles (and their Tallies), Guest body-stats, Guest Weekly Target; recomputes Streak/Shields from the full Set history; clears the Guest record. Runs in a single Room transaction; a failure leaves Guest data unclaimed and intact.

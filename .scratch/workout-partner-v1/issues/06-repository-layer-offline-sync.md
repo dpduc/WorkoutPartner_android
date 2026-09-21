@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 06 — Repository layer & offline sync (Seam 3)
 

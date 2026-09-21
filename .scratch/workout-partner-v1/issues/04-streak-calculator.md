@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 04 — Streak Calculator (Seam 2)
 

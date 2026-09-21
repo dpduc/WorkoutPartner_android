@@ -4,7 +4,7 @@
 
 **Blocked by:** 03.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Only unseen Exercises/Variants in the current Routine show a Form Guide automatically; if every one has already been seen, this phase is skipped entirely and the engine advances straight to Position Check.
 - [x] Each Form Guide shows: a picture, the starting position, correct-form cues, common mistakes, and what the tracker checks.

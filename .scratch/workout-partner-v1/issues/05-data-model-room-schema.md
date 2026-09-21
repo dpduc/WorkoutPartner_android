@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 05 — Data model & Room schema
 

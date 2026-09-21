@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 (schema — `guest_profile` needs its new streak/target/notification columns).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] The Quick Count tile, Roster screen, overflow menu entries, Settings (Weekly Target, reminders), and Progress all work fully for a Guest — every existing `accountId != null` gate in `MainActivity.kt` and elsewhere is removed for these.
 - [x] A Guest can create a Roster of Tracked Profiles and run Quick Count against them, producing Tallies, without signing up.

@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 02 — Two-section main menu, Routine format tags, BMI/age difficulty tuning
 

@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # Workout Partner — v1
 
@@ -11,6 +11,8 @@ People who want to do bodyweight exercise have no low-friction way to get an acc
 Workout Partner is an Android app that uses on-device pose tracking (MediaPipe Pose Landmarker) to count Reps and score form in real time from the front camera. It offers two modes: self-tracking through bundled Routines with a Duolingo-style weekly Streak, and Quick Count for tracking Reps on behalf of someone else via a lightweight Roster. Data is stored offline-first and, for signed-in Accounts, synced through Firebase so history survives reinstalls and is visible on a separate companion Web dashboard.
 
 ## User Stories
+
+> **Superseded in part.** Stories written for an "Account holder" (26–41: Weekly Target, Streak, Shields, heatmap, reminders, Roster, Quick Count) now apply to every **Athlete**, Guest included — `workout-partner-v3` Guest feature parity, [ADR-0007](../../docs/adr/0007-guest-feature-parity-stays-local.md). Story 38 ("no Form Score" in Quick Count) was reversed by `workout-partner-v2` ticket 03. Story 3's prompt is now "Back up your progress". `CONTEXT.md` has the current definitions.
 
 **Accounts & Guest**
 

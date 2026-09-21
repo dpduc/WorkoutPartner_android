@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] `ActivityLevel` stored values are remapped in both `accounts` and `guest_profile`: `LOW`→`SEDENTARY`, `MEDIUM`→`LIGHTLY_ACTIVE`, `HIGH`→`ACTIVE`. (The Kotlin enum itself — `SEDENTARY`/`LIGHTLY_ACTIVE`/`ACTIVE`/`VERY_ACTIVE` — is part of this ticket too, since the migration needs it to exist; the UI that lets someone pick `VERY_ACTIVE` is ticket 07.)
 - [x] `tracked_profiles.accountId` becomes nullable (null = owned by the Guest), mirroring the existing nullable `sessions.accountId`.
