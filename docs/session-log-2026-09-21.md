@@ -41,7 +41,7 @@ Other changes: `CONTEXT.md` gains **AMRAP**; `firestore-schema`, `auth-roadmap` 
 
 ## 4. Still open
 
-- **Unpushed:** commits `568f042` and `ab1656d`. Everything before them is already on `origin/master` (this session's own push attempt was denied by the auto-mode permission check, so it was pushed some other way).
+- **Unpushed:** the three docs commits at the end of this session (`568f042`, `ab1656d` and the one adding this file). Everything before them is already on `origin/master` (this session's own push attempt was denied by the auto-mode permission check, so it was pushed some other way).
 - **Bug:** `SetEntity.toFirestoreMap()` and `TallyEntity.toFirestoreMap()` do not send `exerciseVariant`, so a synced Step Jack Set arrives as a plain Jumping Jack. Nothing calls `SyncEngine` in production yet, so nothing is lost today. Fix with the push path (ADR-0010).
 - **Unverified:** joint angles are computed on normalised (non-aspect-corrected) coordinates, which may distort them; the landscape push-up clip suggests it. Needs a portrait-recorded clip.
 - **Known rough edges:** Position Check's distance rule misjudges horizontal exercises (push-up reads "too far"); "Session complete" title sits under the status bar; the Done button is near the gesture bar; Quick Count's ViewModel may have the same un-keyed `viewModel()` pattern (`QuickCountScreens.kt:81`).
