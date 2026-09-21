@@ -18,6 +18,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -39,6 +40,7 @@ import com.workoutpartner.data.SetRepository
 import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.core.repcounting.ExerciseVariant
+import java.util.UUID
 
 /**
  * Routine picker (ticket 09): the entry point into a Session — bundled
@@ -106,7 +108,11 @@ fun SessionScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    // A fresh key per Session: `viewModel(...)` is scoped to the Activity, so without one the second Session
+    // started in the same app run would be handed the first (finished) Session's ViewModel and its summary.
+    val viewModelKey = remember { UUID.randomUUID().toString() }
     val viewModel: SessionViewModel = viewModel(
+        key = viewModelKey,
         factory = remember {
             viewModelFactory {
                 initializer {
@@ -121,6 +127,7 @@ fun SessionScreen(
             }
         },
     )
+    DisposableEffect(viewModel) { onDispose { viewModel.release() } }
     val phase by viewModel.phase.collectAsState()
     val account by viewModel.account.collectAsState()
 

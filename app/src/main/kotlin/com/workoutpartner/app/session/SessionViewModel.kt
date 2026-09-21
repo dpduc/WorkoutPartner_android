@@ -1,6 +1,7 @@
 package com.workoutpartner.app.session
 
 import android.media.AudioManager
+import android.util.Log
 import android.media.ToneGenerator
 import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
@@ -15,6 +16,7 @@ import com.workoutpartner.data.AccountEntity
 import com.workoutpartner.data.AccountRepository
 import com.workoutpartner.data.RoutineWithSteps
 import com.workoutpartner.data.SetRepository
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -75,6 +77,7 @@ class SessionViewModel(
     private var cameraUnavailable = false
 
     init {
+        Log.i(TRACE_TAG, "SessionViewModel@${System.identityHashCode(this)} created: ${routine.routine.name}, tracker=${poseTracker::class.simpleName}, steps=${steps.map { "${it.exercise}x${it.targetReps}" }}")
         viewModelScope.launch {
             sessionId = setRepository.startSession(accountId, routine.routine.id, Instant.now(clock)).id
         }
@@ -109,6 +112,11 @@ class SessionViewModel(
         engine.finishSet()
         publishPhase()
         val completed = (engine.phase as? SessionPhase.SetSummary)?.completedSet ?: return
+        Log.i(
+            TRACE_TAG,
+            "set done: ${completed.exercise}${completed.variant?.let { "/$it" } ?: ""} reps=${completed.actualReps}/${completed.targetReps} " +
+                "formScore=${completed.formScore} goodSet=${completed.goodSet} note=\"${completed.formNote}\"",
+        )
         val session = sessionId ?: return
         viewModelScope.launch {
             setRepository.recordSet(
@@ -146,6 +154,9 @@ class SessionViewModel(
         if (cameraUnavailable) return
         val previous = _phase.value
         val next = engine.phase
+        if (next::class != previous::class || (next as? SessionPhase.Tracking)?.stepIndex != (previous as? SessionPhase.Tracking)?.stepIndex) {
+            Log.i(TRACE_TAG, "phase: ${previous::class.simpleName} -> ${next::class.simpleName}${(next as? SessionPhase.Tracking)?.let { " (step ${it.stepIndex})" } ?: ""}")
+        }
         _phase.value = next
         announcer.announce(previous, next).forEach(speaker::speak)
     }
@@ -160,18 +171,35 @@ class SessionViewModel(
             lastRepCountSeen = 0
         }
         if (tracking.repCount > lastRepCountSeen) {
+            Log.i(TRACE_TAG, "step ${tracking.stepIndex}: rep ${tracking.repCount}/${tracking.targetReps}")
             toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, BEEP_DURATION_MS)
         }
         lastRepCountSeen = tracking.repCount
     }
 
-    override fun onCleared() {
+    private var released = false
+
+    /**
+     * Stops the camera, ticker, beeps and speech right now. [SessionScreen]
+     * calls this when it leaves the screen: a ViewModel scoped to the Activity
+     * is only cleared when the Activity is, so without it a finished Session's
+     * tracker and 1-second ticker would keep running for the rest of the app's
+     * life. Safe to call more than once ([onCleared] calls it too).
+     */
+    fun release() {
+        if (released) return
+        released = true
+        viewModelScope.coroutineContext.cancelChildren()
         poseTracker.stop()
         toneGenerator.release()
         speaker.shutdown()
     }
 
+    override fun onCleared() = release()
+
     private companion object {
+        /** Filter logcat on this to read reps and Form Scores off a run (`adb logcat -s SessionTrace`). */
+        const val TRACE_TAG = "SessionTrace"
         const val TONE_VOLUME_PERCENT = 80
         const val BEEP_DURATION_MS = 150
     }
