@@ -1,9 +1,12 @@
 package com.workoutpartner.app.di
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.workoutpartner.core.posetracking.CameraPoseTracker
+import com.workoutpartner.core.posetracking.VideoPoseTracker
+import java.io.File
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.data.AccountRepository
 import com.workoutpartner.data.AuthGateway
@@ -74,11 +77,23 @@ class AppContainer(context: Context) {
 
     /**
      * A fresh [CameraPoseTracker] per Session/Quick Count run (it owns a
-     * camera binding, not a shareable singleton). Needs the MediaPipe
-     * `pose_landmarker_lite.task` model asset under
-     * `core-pose-tracking/src/main/assets/`, which — per ticket 03's
-     * disclosed gap — still isn't bundled; this will fail at runtime until
-     * that's provisioned.
+     * camera binding, not a shareable singleton), using the MediaPipe model
+     * bundled under `core-pose-tracking/src/main/assets/`.
+     *
+     * In a debuggable build, a `debug_video.mp4` in the app's private files
+     * directory swaps the camera for a [VideoPoseTracker] playing that clip
+     * — so reps and Form Scores can be checked without standing in front of
+     * the camera (`adb push` it to `/data/local/tmp`, then
+     * `run-as com.workoutpartner.app cp` it into `files/`). Release builds
+     * never look for it.
      */
-    fun createPoseTracker(): PoseTracker = CameraPoseTracker(appContext)
+    fun createPoseTracker(): PoseTracker {
+        val isDebuggable = appContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        val debugVideo = File(appContext.filesDir, DEBUG_VIDEO_NAME)
+        return if (isDebuggable && debugVideo.exists()) VideoPoseTracker(appContext, debugVideo) else CameraPoseTracker(appContext)
+    }
+
+    private companion object {
+        const val DEBUG_VIDEO_NAME = "debug_video.mp4"
+    }
 }
