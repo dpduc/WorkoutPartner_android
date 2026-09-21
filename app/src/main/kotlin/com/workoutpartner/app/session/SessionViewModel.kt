@@ -11,6 +11,7 @@ import com.workoutpartner.app.routines.DifficultyTier
 import com.workoutpartner.app.routines.RoutineDifficulty
 import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.core.posetracking.PoseTracker
+import com.workoutpartner.core.posetracking.RawPoseFrame
 import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.data.AccountEntity
 import com.workoutpartner.data.AccountRepository
@@ -47,6 +48,8 @@ class SessionViewModel(
     private val setRepository: SetRepository,
     private val accountRepository: AccountRepository,
     private val poseTracker: PoseTracker,
+    /** Debug builds only: publish every frame's landmarks as [poseFrame] for [com.workoutpartner.app.ui.components.PoseOverlay]. Off in release, so nothing extra is collected. */
+    private val showPoseOverlay: Boolean,
     /** Speaks [SessionAnnouncer]'s lines (`workout-partner-v3` ticket 13); shut down in [onCleared], like [toneGenerator]. */
     private val speaker: PromptSpeaker,
     phrases: AnnouncerPhrases,
@@ -65,6 +68,10 @@ class SessionViewModel(
     val phase: StateFlow<SessionPhase> = _phase.asStateFlow()
 
     /** The Account's Streak/Weekly Target, refreshed after each Set — null for a Guest Session (no Account to read; ticket 05/06). Session summary hides the Weekly Target section when this stays null. */
+    private val _poseFrame = MutableStateFlow<RawPoseFrame?>(null)
+    val poseFrame: StateFlow<RawPoseFrame?> = _poseFrame.asStateFlow()
+    val previewMirrored: Boolean = poseTracker.mirrorsPreview
+
     private val _account = MutableStateFlow<AccountEntity?>(null)
     val account: StateFlow<AccountEntity?> = _account.asStateFlow()
 
@@ -87,6 +94,9 @@ class SessionViewModel(
                 publishPhase()
                 beepIfNewRep()
             }
+        }
+        if (showPoseOverlay) {
+            viewModelScope.launch { poseTracker.rawFrames.collect { _poseFrame.value = it } }
         }
         viewModelScope.launch {
             poseTracker.errors.collect { message ->

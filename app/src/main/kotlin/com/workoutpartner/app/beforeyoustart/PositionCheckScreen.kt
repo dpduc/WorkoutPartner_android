@@ -31,6 +31,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.workoutpartner.app.R
+import com.workoutpartner.app.debug.isDebuggableBuild
+import com.workoutpartner.app.ui.components.PoseOverlay
+import com.workoutpartner.core.posetracking.RawPoseFrame
 import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.core.posetracking.PoseTracker
 import kotlinx.coroutines.CoroutineStart
@@ -72,6 +75,8 @@ fun PositionCheckScreen(
     val previewView = remember { PreviewView(context) }
     var phase by remember { mutableStateOf(engine.phase) }
     var cameraError by remember { mutableStateOf<String?>(null) }
+    val showPoseOverlay = remember { context.isDebuggableBuild() }
+    var lastFrame by remember { mutableStateOf<RawPoseFrame?>(null) }
 
     fun publish() {
         while (true) {
@@ -93,6 +98,7 @@ fun PositionCheckScreen(
         launch(start = CoroutineStart.UNDISPATCHED) {
             poseTracker.rawFrames.collect { frame ->
                 engine.onPoseFrame(frame)
+                if (showPoseOverlay) lastFrame = frame
                 publish()
             }
         }
@@ -113,6 +119,7 @@ fun PositionCheckScreen(
             modifier = Modifier.fillMaxSize(),
             factory = { previewView },
         )
+        if (showPoseOverlay) PoseOverlay(lastFrame, mirrored = poseTracker.mirrorsPreview, modifier = Modifier.fillMaxSize())
         BodyOutline(
             color = if (status.bodyInFrame && status.distance == DistanceStatus.OK) PASS_COLOR else Color.White,
             modifier = Modifier.fillMaxSize(),

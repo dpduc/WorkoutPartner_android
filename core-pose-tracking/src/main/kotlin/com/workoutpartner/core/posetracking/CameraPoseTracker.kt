@@ -48,6 +48,8 @@ class CameraPoseTracker(private val context: Context) : PoseTracker {
         awaitClose { emitSignal = null }
     }
 
+    override val mirrorsPreview = true
+
     private var emitRawFrame: ((RawPoseFrame) -> Unit)? = null
 
     override val rawFrames: Flow<RawPoseFrame> = callbackFlow {

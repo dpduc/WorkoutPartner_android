@@ -44,6 +44,8 @@ import java.io.File
  */
 class VideoPoseTracker(private val context: Context, private val videoFile: File) : PoseTracker {
 
+    override val mirrorsPreview = false
+
     private var scope: CoroutineScope? = null
     private var playback: Job? = null
     private val trackingStateMachine = TrackingStateMachine()

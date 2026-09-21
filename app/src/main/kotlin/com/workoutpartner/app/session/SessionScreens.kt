@@ -40,6 +40,9 @@ import com.workoutpartner.data.SetRepository
 import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.core.repcounting.ExerciseVariant
+import com.workoutpartner.app.debug.isDebuggableBuild
+import com.workoutpartner.app.ui.components.PoseOverlay
+import com.workoutpartner.core.posetracking.RawPoseFrame
 import java.util.UUID
 
 /**
@@ -111,6 +114,7 @@ fun SessionScreen(
     // A fresh key per Session: `viewModel(...)` is scoped to the Activity, so without one the second Session
     // started in the same app run would be handed the first (finished) Session's ViewModel and its summary.
     val viewModelKey = remember { UUID.randomUUID().toString() }
+    val showPoseOverlay = remember { context.isDebuggableBuild() }
     val viewModel: SessionViewModel = viewModel(
         key = viewModelKey,
         factory = remember {
@@ -118,6 +122,7 @@ fun SessionScreen(
                 initializer {
                     SessionViewModel(
                         routine, accountId, setRepository, accountRepository, poseTrackerFactory(),
+                        showPoseOverlay = showPoseOverlay,
                         speaker = PromptSpeaker(context),
                         phrases = ResourceAnnouncerPhrases(context),
                         difficultyTier = difficultyTier,
@@ -130,6 +135,7 @@ fun SessionScreen(
     DisposableEffect(viewModel) { onDispose { viewModel.release() } }
     val phase by viewModel.phase.collectAsState()
     val account by viewModel.account.collectAsState()
+    val poseFrame by viewModel.poseFrame.collectAsState()
 
     Surface(modifier = modifier.fillMaxSize()) {
         when (val current = phase) {
@@ -139,6 +145,8 @@ fun SessionScreen(
                 routine = routine,
                 onCameraReady = viewModel::startCamera,
                 onFinishSet = viewModel::finishSet,
+                poseFrame = if (showPoseOverlay) poseFrame else null,
+                previewMirrored = viewModel.previewMirrored,
             )
             is SessionPhase.SetSummary -> SetSummaryContent(
                 current,
@@ -182,6 +190,9 @@ private fun TrackingContent(
     routine: RoutineWithSteps,
     onCameraReady: (androidx.lifecycle.LifecycleOwner, Preview.SurfaceProvider) -> Unit,
     onFinishSet: () -> Unit,
+    /** Debug builds only: the latest frame's landmarks, drawn over the preview by [PoseOverlay]. */
+    poseFrame: RawPoseFrame?,
+    previewMirrored: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -197,6 +208,7 @@ private fun TrackingContent(
                 }
             },
         )
+        if (poseFrame != null) PoseOverlay(poseFrame, mirrored = previewMirrored, modifier = Modifier.fillMaxSize())
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween,

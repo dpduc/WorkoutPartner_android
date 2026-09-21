@@ -1,9 +1,9 @@
 package com.workoutpartner.app.di
 
 import android.content.Context
-import android.content.pm.ApplicationInfo
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.workoutpartner.app.debug.isDebuggableBuild
 import com.workoutpartner.core.posetracking.CameraPoseTracker
 import com.workoutpartner.core.posetracking.VideoPoseTracker
 import java.io.File
@@ -88,9 +88,8 @@ class AppContainer(context: Context) {
      * never look for it.
      */
     fun createPoseTracker(): PoseTracker {
-        val isDebuggable = appContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
         val debugVideo = File(appContext.filesDir, DEBUG_VIDEO_NAME)
-        return if (isDebuggable && debugVideo.exists()) VideoPoseTracker(appContext, debugVideo) else CameraPoseTracker(appContext)
+        return if (appContext.isDebuggableBuild() && debugVideo.exists()) VideoPoseTracker(appContext, debugVideo) else CameraPoseTracker(appContext)
     }
 
     private companion object {
