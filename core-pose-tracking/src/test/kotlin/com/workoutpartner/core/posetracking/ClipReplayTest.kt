@@ -1,6 +1,8 @@
 package com.workoutpartner.core.posetracking
 
 import com.workoutpartner.core.repcounting.Exercise
+import com.workoutpartner.core.repcounting.FormScore
+import com.workoutpartner.core.repcounting.RepEvent
 import com.workoutpartner.core.repcounting.RepCounter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -21,7 +23,14 @@ class ClipReplayTest {
 
     @Test
     fun `jumping jack clip counts its 4 jumping jacks`() {
-        assertEquals(4, countReps("/clips/jumpingjack.landmarks.csv", Exercise.JUMPING_JACK))
+        assertEquals(4, replay("/clips/jumpingjack.landmarks.csv", Exercise.JUMPING_JACK).size)
+    }
+
+    @Test
+    fun `the 4 good-but-imperfect jumping jacks all pass form`() {
+        val events = replay("/clips/jumpingjack.landmarks.csv", Exercise.JUMPING_JACK)
+
+        assertEquals(100, FormScore.compute(events))
     }
 
     /**
@@ -32,20 +41,18 @@ class ClipReplayTest {
      */
     @Test
     fun `push-up clip counts within one of its 7 push-ups`() {
-        val reps = countReps("/clips/pushup.landmarks.csv", Exercise.PUSH_UP)
+        val reps = replay("/clips/pushup.landmarks.csv", Exercise.PUSH_UP).size
 
         assertTrue("counted $reps push-ups, expected 6..8 (truth: 7)", reps in 6..8)
     }
 
-    private fun countReps(resource: String, exercise: Exercise): Int {
+    private fun replay(resource: String, exercise: Exercise): List<RepEvent> {
         val counter = RepCounter.forExercise(exercise)
         val tracking = TrackingStateMachine()
-        var reps = 0
-        readFrames(resource).forEach { raw ->
+        return readFrames(resource).mapNotNull { raw ->
             val signal = tracking.accept(PoseFrameMapper.toPoseLandmarkFrame(raw))
-            if (signal is PoseTrackingSignal.Trackable && counter.process(signal.frame) != null) reps++
+            if (signal is PoseTrackingSignal.Trackable) counter.process(signal.frame) else null
         }
-        return reps
     }
 
     /** One CSV row per frame: `videoMs,x,y,z,visibility,presence,` repeated per landmark (-1 = score not reported). */

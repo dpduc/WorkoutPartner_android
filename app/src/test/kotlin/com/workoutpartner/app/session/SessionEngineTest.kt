@@ -194,14 +194,14 @@ class SessionEngineTest {
     }
 
     @Test
-    fun `a Step Jack step judges Good Set against Step Jack's own 135-degree form threshold, not Jumping Jack's 150-degree one`() {
-        // 140 degrees clears Step Jack's form threshold (135) but falls
-        // short of Jumping Jack's (150) — the exact same physical sweep
+    fun `a Step Jack step judges Good Set against Step Jack's own 110-degree form threshold, not Jumping Jack's 125-degree one`() {
+        // 118 degrees clears Step Jack's form threshold (110) but falls
+        // short of Jumping Jack's (125) — the exact same physical sweep
         // should grade differently depending on which the step is.
         val stepJackEngine = trackingEngine(
             RoutineStep(Exercise.JUMPING_JACK, targetReps = 1, restIntervalSeconds = 30, variant = ExerciseVariant.STEP_JACK),
         )
-        completeOneJumpingJackFamilyRepAt(stepJackEngine, sweepAngle = 140f)
+        completeOneJumpingJackFamilyRepAt(stepJackEngine, sweepAngle = 118f)
         stepJackEngine.finishSet()
         val stepJackSet = (stepJackEngine.phase as SessionPhase.SetSummary).completedSet
         assertEquals(ExerciseVariant.STEP_JACK, stepJackSet.variant)
@@ -209,7 +209,7 @@ class SessionEngineTest {
         assertTrue(stepJackSet.goodSet)
 
         val jumpingJackEngine = trackingEngine(RoutineStep(Exercise.JUMPING_JACK, targetReps = 1, restIntervalSeconds = 30))
-        completeOneJumpingJackFamilyRepAt(jumpingJackEngine, sweepAngle = 140f)
+        completeOneJumpingJackFamilyRepAt(jumpingJackEngine, sweepAngle = 118f)
         jumpingJackEngine.finishSet()
         val jumpingJackSet = (jumpingJackEngine.phase as SessionPhase.SetSummary).completedSet
         assertEquals(null, jumpingJackSet.variant)

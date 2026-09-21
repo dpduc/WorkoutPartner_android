@@ -33,11 +33,11 @@ class RepCounterVariantTest {
     }
 
     @Test
-    fun `Form Score uses Step Jack's own 135-degree threshold, not Jumping Jack's 150-degree one`() {
-        // 140 degrees clears both Exercises' rep thresholds (75/90) — a Rep
-        // counts either way — but only clears Step Jack's 135-degree form
-        // threshold, not Jumping Jack's 150-degree one.
-        val sweepAngle = 140f
+    fun `Form Score uses Step Jack's own 110-degree threshold, not Jumping Jack's 125-degree one`() {
+        // 118 degrees clears both Exercises' rep thresholds (75/90) — a Rep
+        // counts either way — but only clears Step Jack's 110-degree form
+        // threshold, not Jumping Jack's 125-degree one.
+        val sweepAngle = 118f
 
         val stepJackEvents = feed(Exercise.JUMPING_JACK, ExerciseVariant.STEP_JACK, stepJackProfile.restingAngle(), sweepAngle, stepJackProfile.restingAngle())
         assertEquals(1, stepJackEvents.size)

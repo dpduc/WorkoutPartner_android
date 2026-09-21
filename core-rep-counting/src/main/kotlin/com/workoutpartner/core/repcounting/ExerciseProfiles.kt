@@ -63,7 +63,11 @@ object ExerciseProfiles {
             jointC = Landmark.HIP,
             direction = RepDirection.INCREASING,
             repThresholdDegrees = 90f,
-            formThresholdDegrees = 150f, // roughly arms-fully-overhead depth
+            // Was 150 ("arms fully overhead"), but MediaPipe's 3D elbow-shoulder-hip angle
+            // rarely reads that high even on good jacks: four hand-verified good (if not perfect)
+            // jacks on a recorded clip peaked at 130-137 degrees once smoothed (`ClipReplayTest`),
+            // and every one failed form. 125 sits just under the lowest of them.
+            formThresholdDegrees = 125f,
         ),
         ExerciseProfile(
             exercise = Exercise.JUMPING_JACK,
@@ -77,7 +81,9 @@ object ExerciseProfiles {
             jointC = Landmark.HIP,
             direction = RepDirection.INCREASING,
             repThresholdDegrees = 75f,
-            formThresholdDegrees = 135f,
+            // Lowered from 135 in step with Jumping Jack's 150 -> 125 (both are placeholders): Step Jack
+            // must keep the shallower bar, since it never needs the arms as wide.
+            formThresholdDegrees = 110f,
         ),
     ).associateBy { it.exercise to it.variant }
 
