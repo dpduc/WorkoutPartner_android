@@ -4,6 +4,7 @@ import com.workoutpartner.core.posetracking.PoseTrackingSignal
 import com.workoutpartner.core.repcounting.Exercise
 import com.workoutpartner.core.repcounting.Landmark
 import com.workoutpartner.core.repcounting.PoseLandmarkFrame
+import com.workoutpartner.core.repcounting.RepCounter
 import com.workoutpartner.core.repcounting.Point3D
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -30,9 +31,9 @@ class QuickCountEngineTest {
 
         // Never even reaches the form threshold — still counts, since Quick
         // Count has no Form Score gate (spec.md story 38).
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(squatFrameAtAngle(120f)))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
+        engine.holdFrame(restingSquatFrame)
+        engine.holdFrame(squatFrameAtAngle(120f))
+        engine.holdFrame(restingSquatFrame)
 
         assertEquals(QuickCountPhase.Running(repCount = 1, trackable = true), engine.phase)
     }
@@ -71,12 +72,12 @@ class QuickCountEngineTest {
     fun `Lost then Trackable auto-resumes without losing the rep already in progress`() {
         val engine = QuickCountEngine(Exercise.SQUAT, target = null)
 
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(deepSquatFrame))
+        engine.holdFrame(restingSquatFrame)
+        engine.holdFrame(deepSquatFrame)
         engine.onPoseSignal(PoseTrackingSignal.Lost)
         assertEquals(QuickCountPhase.Running(repCount = 0, trackable = false), engine.phase)
 
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
+        engine.holdFrame(restingSquatFrame)
 
         assertEquals(QuickCountPhase.Running(repCount = 1, trackable = true), engine.phase)
     }
@@ -93,9 +94,9 @@ class QuickCountEngineTest {
         val engine = QuickCountEngine(Exercise.SQUAT, target = null)
 
         completeOneRep(engine) // deep squat (80 degrees) — passes the form threshold
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(squatFrameAtAngle(120f))) // shallow — counts as a Rep, fails form
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
+        engine.holdFrame(restingSquatFrame)
+        engine.holdFrame(squatFrameAtAngle(120f)) // shallow — counts as a Rep, fails form
+        engine.holdFrame(restingSquatFrame)
 
         assertEquals(QuickCountPhase.Running(repCount = 2, trackable = true), engine.phase)
         assertEquals(50, engine.formScore)
@@ -114,9 +115,9 @@ class QuickCountEngineTest {
     }
 
     private fun completeOneRep(engine: QuickCountEngine) {
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(deepSquatFrame))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
+        engine.holdFrame(restingSquatFrame)
+        engine.holdFrame(deepSquatFrame)
+        engine.holdFrame(restingSquatFrame)
     }
 
     private fun squatFrameAtAngle(angleDegrees: Float): PoseLandmarkFrame {
@@ -129,4 +130,8 @@ class QuickCountEngineTest {
             ),
         )
     }
+
+    /** Each phase of a movement is held for a full smoothing window: the counter now needs a sustained change, not a one-frame blip. */
+    private fun QuickCountEngine.holdFrame(frame: PoseLandmarkFrame) =
+        repeat(RepCounter.SMOOTHING_WINDOW) { onPoseSignal(PoseTrackingSignal.Trackable(frame)) }
 }

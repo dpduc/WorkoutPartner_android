@@ -5,6 +5,7 @@ import com.workoutpartner.core.repcounting.Exercise
 import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.core.repcounting.Landmark
 import com.workoutpartner.core.repcounting.PoseLandmarkFrame
+import com.workoutpartner.core.repcounting.RepCounter
 import com.workoutpartner.core.repcounting.Point3D
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -43,9 +44,9 @@ class SessionEngineTest {
     fun `a full Rep cycle increments the rep counter while Tracking`() {
         val engine = trackingEngine(RoutineStep(Exercise.SQUAT, targetReps = 10, restIntervalSeconds = 30))
 
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(deepSquatFrame))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
+        engine.holdFrame(restingSquatFrame)
+        engine.holdFrame(deepSquatFrame)
+        engine.holdFrame(restingSquatFrame)
 
         assertEquals(SessionPhase.Tracking(stepIndex = 0, repCount = 1, trackable = true, targetReps = 10), engine.phase)
     }
@@ -54,14 +55,14 @@ class SessionEngineTest {
     fun `Lost then Trackable auto-resumes without losing the rep already in progress`() {
         val engine = trackingEngine(RoutineStep(Exercise.SQUAT, targetReps = 10, restIntervalSeconds = 30))
 
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(deepSquatFrame))
+        engine.holdFrame(restingSquatFrame)
+        engine.holdFrame(deepSquatFrame)
         engine.onPoseSignal(PoseTrackingSignal.Lost)
         assertEquals(SessionPhase.Tracking(stepIndex = 0, repCount = 0, trackable = false, targetReps = 10), engine.phase)
 
         // Resumes on the same RepCounter — the rep completes normally once
         // tracking comes back, no restart needed.
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
+        engine.holdFrame(restingSquatFrame)
 
         assertEquals(SessionPhase.Tracking(stepIndex = 0, repCount = 1, trackable = true, targetReps = 10), engine.phase)
     }
@@ -108,9 +109,9 @@ class SessionEngineTest {
         val engine = trackingEngine(RoutineStep(Exercise.SQUAT, targetReps = 1, restIntervalSeconds = 30))
         // Reaches the rep threshold (130 degrees) but well short of the form
         // threshold (100 degrees) — a Rep that counts but fails form.
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(squatFrameAtAngle(120f)))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
+        engine.holdFrame(restingSquatFrame)
+        engine.holdFrame(squatFrameAtAngle(120f))
+        engine.holdFrame(restingSquatFrame)
 
         engine.finishSet()
 
@@ -223,9 +224,9 @@ class SessionEngineTest {
     }
 
     private fun completeOneGoodRep(engine: SessionEngine) {
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(deepSquatFrame))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(restingSquatFrame))
+        engine.holdFrame(restingSquatFrame)
+        engine.holdFrame(deepSquatFrame)
+        engine.holdFrame(restingSquatFrame)
     }
 
     /** Builds a frame where the Squat's hip-knee-ankle angle reads exactly [angleDegrees] — same construction trick core-rep-counting's own fixtures use. */
@@ -254,8 +255,12 @@ class SessionEngineTest {
 
     /** A rep from well below both Jumping Jack's (90) and Step Jack's (75) rep thresholds, up to [sweepAngle], and back. */
     private fun completeOneJumpingJackFamilyRepAt(engine: SessionEngine, sweepAngle: Float) {
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(jumpingJackFamilyFrameAtAngle(40f)))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(jumpingJackFamilyFrameAtAngle(sweepAngle)))
-        engine.onPoseSignal(PoseTrackingSignal.Trackable(jumpingJackFamilyFrameAtAngle(40f)))
+        engine.holdFrame(jumpingJackFamilyFrameAtAngle(40f))
+        engine.holdFrame(jumpingJackFamilyFrameAtAngle(sweepAngle))
+        engine.holdFrame(jumpingJackFamilyFrameAtAngle(40f))
     }
+
+    /** Each phase of a movement is held for a full smoothing window: the counter now needs a sustained change, not a one-frame blip. */
+    private fun SessionEngine.holdFrame(frame: PoseLandmarkFrame) =
+        repeat(RepCounter.SMOOTHING_WINDOW) { onPoseSignal(PoseTrackingSignal.Trackable(frame)) }
 }

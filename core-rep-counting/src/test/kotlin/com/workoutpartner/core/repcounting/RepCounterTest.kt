@@ -41,9 +41,31 @@ class RepCounterTest(private val profile: ExerciseProfile) {
         assertEquals(0, FormScore.compute(events))
     }
 
+    /** Each angle is held for a full smoothing window: a phase change now has to be sustained, not a one-frame blip. */
     private fun feed(vararg angles: Float): List<RepEvent> {
         val counter = RepCounter.forExercise(profile.exercise)
-        return angles.toList().mapNotNull { counter.process(frameAtAngle(profile, it)) }
+        return angles.toList().flatMap { angle -> List(RepCounter.SMOOTHING_WINDOW) { angle } }
+            .mapNotNull { counter.process(frameAtAngle(profile, it)) }
+    }
+
+    @Test
+    fun `a one-frame spike into the engaged range does not count a Rep`() {
+        val counter = RepCounter.forExercise(profile.exercise)
+        val angles = List(6) { profile.restingAngle() } + profile.beyondFormThreshold() + List(6) { profile.restingAngle() }
+
+        assertTrue(angles.mapNotNull { counter.process(frameAtAngle(profile, it)) }.isEmpty())
+    }
+
+    @Test
+    fun `wobbling around the rep threshold while engaged counts one Rep, not several`() {
+        val counter = RepCounter.forExercise(profile.exercise)
+        val wobble = listOf(profile.repThresholdDegrees, profile.direction.towardResting(profile.repThresholdDegrees, 8f))
+        val angles = List(8) { profile.restingAngle() } +
+            List(8) { profile.beyondFormThreshold() } +
+            List(12) { wobble[it % 2] } + // hovers within the release margin: still one movement
+            List(8) { profile.restingAngle() }
+
+        assertEquals(1, angles.mapNotNull { counter.process(frameAtAngle(profile, it)) }.size)
     }
 
     companion object {

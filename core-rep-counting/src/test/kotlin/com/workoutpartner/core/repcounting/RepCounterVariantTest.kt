@@ -58,6 +58,6 @@ class RepCounterVariantTest {
     private fun feed(exercise: Exercise, variant: ExerciseVariant?, vararg angles: Float): List<RepEvent> {
         val profile = ExerciseProfiles.forExercise(exercise, variant)
         val counter = RepCounter.forExercise(exercise, variant)
-        return angles.toList().mapNotNull { counter.process(frameAtAngle(profile, it)) }
+        return angles.toList().flatMap { angle -> List(RepCounter.SMOOTHING_WINDOW) { angle } }.mapNotNull { counter.process(frameAtAngle(profile, it)) }
     }
 }
