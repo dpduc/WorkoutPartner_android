@@ -107,3 +107,9 @@ Foreground Service to log/notify through):
 - Any change to `TrackingStateMachine`'s existing Lost/Resume debounce for a
   person stepping out of frame — that is normal, expected tracking behavior,
   not a camera failure, and is not touched by ticket 03.
+
+## Comments
+
+**Review deferred to when every ticket here ships.** Ticket 01 is done; the
+owner is holding off reviewing this spec's work until 02 and 03 are also
+shipped, then looking at all three together rather than one at a time.
