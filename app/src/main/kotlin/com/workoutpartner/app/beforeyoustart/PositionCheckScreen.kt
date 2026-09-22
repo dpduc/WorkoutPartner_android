@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.keepScreenOn
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -114,7 +115,9 @@ fun PositionCheckScreen(
     // Every effect above is already registered; once the engine leaves Position Check there's nothing left to draw.
     val status = (phase as? BeforeYouStartPhase.PositionCheck)?.status ?: return
 
-    Box(modifier = modifier.fillMaxSize()) {
+    // Only while the Position Check is actively shown — the early return above means leaving this
+    // composable drops the modifier automatically, letting the screen time out normally again.
+    Box(modifier = modifier.fillMaxSize().keepScreenOn()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { previewView },

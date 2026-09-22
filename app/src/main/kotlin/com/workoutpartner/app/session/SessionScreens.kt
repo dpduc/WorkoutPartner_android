@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.keepScreenOn
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -199,7 +200,9 @@ private fun TrackingContent(
     val step = routine.steps[phase.stepIndex]
     val progress = (phase.repCount.toFloat() / phase.targetReps.coerceAtLeast(1)).coerceIn(0f, 1f)
 
-    Box(modifier = modifier.fillMaxSize()) {
+    // Only while a Set is actively tracking — leaving this composable (phase changes to SetSummary/
+    // Resting/etc.) drops the modifier automatically, letting the screen time out normally again.
+    Box(modifier = modifier.fillMaxSize().keepScreenOn()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { context ->

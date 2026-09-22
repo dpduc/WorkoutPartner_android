@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.keepScreenOn
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -149,7 +150,9 @@ fun QuickCountRunScreen(
 
     Surface(modifier = modifier.fillMaxSize()) {
         when (val current = phase) {
-            is QuickCountPhase.Running -> Box(modifier = Modifier.fillMaxSize()) {
+            // Only while actively tracking — leaving this branch (Finished/CameraUnavailable) drops the
+            // modifier automatically, letting the screen time out normally again.
+            is QuickCountPhase.Running -> Box(modifier = Modifier.fillMaxSize().keepScreenOn()) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { context ->
