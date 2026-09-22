@@ -17,6 +17,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,12 +25,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.workoutpartner.app.beforeyoustart.BeforeYouStartEngine
+import com.workoutpartner.app.beforeyoustart.BeforeYouStartPhase
+import com.workoutpartner.app.beforeyoustart.PositionCheckScreen
+import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.core.repcounting.Exercise
 import com.workoutpartner.data.TallyRepository
@@ -64,6 +70,58 @@ fun QuickCountSetupScreen(profile: TrackedProfileEntity, onStart: (Exercise, Int
                 modifier = Modifier.padding(top = 16.dp),
             ) { Text("Start") }
         }
+    }
+}
+
+/**
+ * Quick Count's entry point (`workout-partner-v3` ticket 14, spec.md stories
+ * 81-83): runs the Position Check — the same [BeforeYouStartEngine] ticket
+ * 12 built for a Session, via [BeforeYouStartEngine.forQuickCount], so it's
+ * the same checks, the same spoken cues, and the same "Start anyway" — before
+ * handing off to [QuickCountRunScreen]. No Workout Overview, Form Guides, or
+ * Countdown: the engine starts directly at [BeforeYouStartPhase.PositionCheck]
+ * and reaches [BeforeYouStartPhase.Ready] the moment that phase ends, with
+ * nothing in between.
+ *
+ * The Position Check's tracker is its own instance, stopped once that phase
+ * ends ([PositionCheckScreen]'s own `DisposableEffect`) — [QuickCountRunScreen]
+ * then creates a fresh one via [poseTrackerFactory] for the run itself, the
+ * same "one tracker per phase" split [BeforeYouStartScreen][com.workoutpartner.app.beforeyoustart.BeforeYouStartScreen] uses ahead of a Session.
+ */
+@Composable
+fun QuickCountScreen(
+    trackedProfileId: String,
+    exercise: Exercise,
+    target: Int?,
+    tallyRepository: TallyRepository,
+    poseTrackerFactory: () -> PoseTracker,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val engine = remember { BeforeYouStartEngine.forQuickCount() }
+    var phase by remember { mutableStateOf(engine.phase) }
+    val context = LocalContext.current
+    val speaker = remember { PromptSpeaker(context) }
+    DisposableEffect(speaker) { onDispose { speaker.shutdown() } }
+
+    if (phase is BeforeYouStartPhase.PositionCheck) {
+        PositionCheckScreen(
+            engine = engine,
+            poseTracker = remember { poseTrackerFactory() },
+            speaker = speaker,
+            onPhaseChanged = { phase = engine.phase },
+            modifier = modifier,
+        )
+    } else {
+        QuickCountRunScreen(
+            trackedProfileId = trackedProfileId,
+            exercise = exercise,
+            target = target,
+            tallyRepository = tallyRepository,
+            poseTrackerFactory = poseTrackerFactory,
+            onDone = onDone,
+            modifier = modifier,
+        )
     }
 }
 

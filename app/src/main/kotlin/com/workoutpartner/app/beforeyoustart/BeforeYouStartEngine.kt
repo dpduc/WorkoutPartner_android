@@ -57,8 +57,18 @@ sealed interface BeforeYouStartPhase {
  * guidance is emitted as [PositionCue]s for the caller to [takeCue] and
  * speak. The Countdown (ticket 13) then counts [COUNTDOWN_SECONDS] ticks down
  * to Ready — the caller starts the Session's first Set straight away, no tap.
+ *
+ * Quick Count (ticket 14) uses this same engine via [forQuickCount] rather
+ * than a parallel implementation, since its Position Check is exactly ticket
+ * 12's — same checks, same cues, same "Start anyway" — just without the
+ * Overview/Form Guides/Countdown phases around it that make no sense for a
+ * quick, one-off run.
  */
-class BeforeYouStartEngine(private val unseenGuides: List<TrackedExercise>) {
+class BeforeYouStartEngine(
+    private val unseenGuides: List<TrackedExercise>,
+    /** Quick Count's configuration (ticket 14; callers should prefer the [forQuickCount] factory over passing this directly): starts directly at [BeforeYouStartPhase.PositionCheck] and, once it passes (or "Start anyway" is used), goes straight to [BeforeYouStartPhase.Ready] instead of [BeforeYouStartPhase.Countdown]. */
+    private val quickCount: Boolean = false,
+) {
     var phase: BeforeYouStartPhase = BeforeYouStartPhase.Overview
         private set
 
@@ -76,13 +86,20 @@ class BeforeYouStartEngine(private val unseenGuides: List<TrackedExercise>) {
     private var secondsSinceDistanceCue = 0
     private val cues = ArrayDeque<PositionCue>()
 
+    init {
+        // Placed after every other property above: currentStatus() (via
+        // initialPositionCheck()) reads them, and property initializers run
+        // top-to-bottom, so this must come last to see their real values.
+        if (quickCount) phase = initialPositionCheck()
+    }
+
     /** Moves from the current phase to the next one in the fixed sequence. No-op once [BeforeYouStartPhase.Ready]. */
     fun advance() {
         phase = when (phase) {
             BeforeYouStartPhase.Overview ->
                 if (unseenGuides.isEmpty()) initialPositionCheck() else BeforeYouStartPhase.FormGuides(unseenGuides)
             is BeforeYouStartPhase.FormGuides -> initialPositionCheck()
-            is BeforeYouStartPhase.PositionCheck -> BeforeYouStartPhase.Countdown(COUNTDOWN_SECONDS)
+            is BeforeYouStartPhase.PositionCheck -> if (quickCount) BeforeYouStartPhase.Ready else BeforeYouStartPhase.Countdown(COUNTDOWN_SECONDS)
             is BeforeYouStartPhase.Countdown -> BeforeYouStartPhase.Ready
             BeforeYouStartPhase.Ready -> BeforeYouStartPhase.Ready
         }
@@ -182,6 +199,9 @@ class BeforeYouStartEngine(private val unseenGuides: List<TrackedExercise>) {
     }
 
     companion object {
+        /** Quick Count's configuration (ticket 14, spec.md stories 81-83): starts at [BeforeYouStartPhase.PositionCheck] with no Overview/Form Guides before it, and ends at [BeforeYouStartPhase.Ready] with no Countdown after it. */
+        fun forQuickCount(): BeforeYouStartEngine = BeforeYouStartEngine(unseenGuides = emptyList(), quickCount = true)
+
         /** Seconds of the huge-digit countdown between the Position Check and the first Set (spec.md story 67). */
         const val COUNTDOWN_SECONDS = 10
 

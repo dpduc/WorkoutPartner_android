@@ -401,6 +401,39 @@ class BeforeYouStartEngineTest {
         assertEquals(BeforeYouStartPhase.Ready, engine.phase)
     }
 
+    // --- Quick Count (workout-partner-v3 ticket 14) ---
+
+    @Test
+    fun `forQuickCount starts directly at Position Check, with no Overview or Form Guides first`() {
+        val engine = BeforeYouStartEngine.forQuickCount()
+
+        assertTrue(engine.phase is BeforeYouStartPhase.PositionCheck)
+    }
+
+    @Test
+    fun `forQuickCount reaches Ready once the Position Check passes, with no Countdown after it`() {
+        val engine = BeforeYouStartEngine.forQuickCount()
+
+        engine.onPoseFrame(goodFrame())
+        engine.onTick()
+        engine.onPoseFrame(goodFrame())
+        engine.onTick()
+
+        assertEquals(BeforeYouStartPhase.Ready, engine.phase)
+    }
+
+    @Test
+    fun `forQuickCount's Start anyway is available after 15 seconds and also skips straight to Ready`() {
+        val engine = BeforeYouStartEngine.forQuickCount()
+        repeat(14) { engine.onTick() }
+        assertFalse(positionCheck(engine).startAnywayAvailable)
+
+        repeat(1) { engine.onTick() }
+        engine.startAnyway()
+
+        assertEquals(BeforeYouStartPhase.Ready, engine.phase)
+    }
+
     /** Position Check -> Countdown the way "Start anyway" gets there: after its 15 seconds. */
     private fun BeforeYouStartEngine.startPastPositionCheck() {
         repeat(15) { onTick() }

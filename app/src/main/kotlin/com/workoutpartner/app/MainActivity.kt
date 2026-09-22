@@ -52,7 +52,7 @@ import com.workoutpartner.app.onboarding.SignInScreen
 import com.workoutpartner.app.onboarding.SignUpScreen
 import com.workoutpartner.app.onboarding.WelcomeScreen
 import com.workoutpartner.app.progress.ProgressScreen
-import com.workoutpartner.app.quickcount.QuickCountRunScreen
+import com.workoutpartner.app.quickcount.QuickCountScreen
 import com.workoutpartner.app.quickcount.QuickCountSetupScreen
 import com.workoutpartner.app.quickcount.RosterScreen
 import com.workoutpartner.app.quickcount.TallyHistoryScreen
@@ -341,7 +341,7 @@ fun WorkoutPartnerApp(container: AppContainer) {
             onStart = { exercise, target -> screen = AppScreen.QuickCountRun(current.profile, exercise, target) },
         )
         is AppScreen.QuickCountRun -> CameraPermissionGate {
-            QuickCountRunScreen(
+            QuickCountScreen(
                 trackedProfileId = current.profile.id,
                 exercise = current.exercise,
                 target = current.target,
