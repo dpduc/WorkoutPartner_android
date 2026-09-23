@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -43,13 +42,15 @@ import kotlinx.coroutines.launch
 
 /**
  * The Position Check phase's UI (`workout-partner-v3` ticket 12): a live
- * front-camera preview with a body outline, "whole body in frame" and
- * "distance OK" indicators, and a "Start anyway" button once
- * [PositionCheckStatus.startAnywayAvailable]. All the actual judgement lives
- * in [engine] ([BeforeYouStartEngine], tested by `BeforeYouStartEngineTest`);
- * this composable only feeds it camera frames and once-a-second ticks,
- * speaks whatever [PositionCue]s it emits, and calls [onPhaseChanged] the
- * moment the engine leaves Position Check (auto-advance or "Start anyway").
+ * front-camera preview with a body outline and "whole body in frame"/
+ * "distance OK" indicators. All the actual judgement lives in [engine]
+ * ([BeforeYouStartEngine], tested by `BeforeYouStartEngineTest`), including
+ * when to give up waiting and proceed anyway — this composable only feeds it
+ * camera frames and once-a-second ticks, speaks whatever [PositionCue]s it
+ * emits, and calls [onPhaseChanged] the moment the engine leaves Position
+ * Check. No button for that: see [BeforeYouStartEngine]'s own doc comment
+ * for why a tap-gated override doesn't work for what this screen is asking
+ * the Athlete to do (step back out of the phone's reach).
  *
  * Unlike `SessionScreen`, this owns its tracker and ticker in the
  * composition (no ViewModel): the whole app's navigation state is plain
@@ -114,6 +115,9 @@ fun PositionCheckScreen(
 
     // Every effect above is already registered; once the engine leaves Position Check there's nothing left to draw.
     val status = (phase as? BeforeYouStartPhase.PositionCheck)?.status ?: return
+    // Computed once and shared by the outline color and the banner below, so they can't disagree
+    // with each other about whether the checks are actually passing right now.
+    val allChecksPassing = status.bodyInFrame && status.distance == DistanceStatus.OK
 
     // Only while the Position Check is actively shown — the early return above means leaving this
     // composable drops the modifier automatically, letting the screen time out normally again.
@@ -124,7 +128,7 @@ fun PositionCheckScreen(
         )
         if (showPoseOverlay) PoseOverlay(lastFrame, mirrored = poseTracker.mirrorsPreview, modifier = Modifier.fillMaxSize())
         BodyOutline(
-            color = if (status.bodyInFrame && status.distance == DistanceStatus.OK) PASS_COLOR else Color.White,
+            color = if (allChecksPassing) PASS_COLOR else Color.White,
             modifier = Modifier.fillMaxSize(),
         )
         Column(
@@ -133,7 +137,11 @@ fun PositionCheckScreen(
         ) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    "Put your phone down, then step back until your whole body fits the outline.",
+                    if (allChecksPassing) {
+                        "Looking good — hold still to begin."
+                    } else {
+                        "Put your phone down, then step back until your whole body fits the outline."
+                    },
                     modifier = Modifier.padding(12.dp),
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -148,11 +156,6 @@ fun PositionCheckScreen(
                     Column(modifier = Modifier.padding(12.dp)) {
                         Indicator(passed = status.bodyInFrame, label = "Whole body in frame")
                         Indicator(passed = status.distance == DistanceStatus.OK, label = distanceLabel(status.distance))
-                    }
-                }
-                if (status.startAnywayAvailable) {
-                    Button(onClick = { engine.startAnyway(); publish() }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Start anyway")
                     }
                 }
             }

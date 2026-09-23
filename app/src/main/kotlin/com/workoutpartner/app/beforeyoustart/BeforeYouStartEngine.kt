@@ -5,16 +5,13 @@ import com.workoutpartner.core.posetracking.RawPoseFrame
 
 /**
  * Where the Position Check (`workout-partner-v3` ticket 12) currently stands
- * — what the screen's "whole body in frame"/"distance OK" indicators and its
- * "Start anyway" button render. [secondsElapsed] counts engine ticks spent in
- * the phase; [startAnywayAvailable] flips on once that reaches
- * [BeforeYouStartEngine.START_ANYWAY_AFTER_SECONDS].
+ * — what the screen's "whole body in frame"/"distance OK" indicators render.
+ * [secondsElapsed] counts engine ticks spent in the phase.
  */
 data class PositionCheckStatus(
     val bodyInFrame: Boolean,
     val distance: DistanceStatus,
     val secondsElapsed: Int,
-    val startAnywayAvailable: Boolean,
 )
 
 /** A line the Position Check wants spoken aloud — the caller (not this pure engine) turns it into speech via [BeforeYouStartEngine.takeCue]. */
@@ -52,21 +49,30 @@ sealed interface BeforeYouStartPhase {
  *
  * The Position Check (ticket 12) is fed [onPoseFrame]s and once-a-second
  * [onTick]s, and advances itself to Countdown after [REQUIRED_STABLE_SECONDS]
- * of every check passing while standing still — or [startAnyway] once
- * [START_ANYWAY_AFTER_SECONDS] have passed, for an imperfect setup. Spoken
- * guidance is emitted as [PositionCue]s for the caller to [takeCue] and
+ * of every check passing while standing still — or on its own, unconditionally,
+ * once [POSITION_CHECK_TIMEOUT_SECONDS] have passed, for an imperfect setup.
+ * Spoken guidance is emitted as [PositionCue]s for the caller to [takeCue] and
  * speak. The Countdown (ticket 13) then counts [COUNTDOWN_SECONDS] ticks down
  * to Ready — the caller starts the Session's first Set straight away, no tap.
  *
+ * That timeout used to be a tap-gated "Start anyway" button instead of an
+ * automatic advance — dropped because it was a reachability problem, not
+ * just a design nicety: by the time the timeout was reached, an Athlete who
+ * followed the Position Check's own instruction had stepped back exactly far
+ * enough that the phone (and any button on it) was out of reach. There is no
+ * longer a manual override to reach for; [onTick] just resolves the phase on
+ * its own once the timeout passes, whether or not the checks ever cleanly
+ * passed.
+ *
  * Quick Count (ticket 14) uses this same engine via [forQuickCount] rather
  * than a parallel implementation, since its Position Check is exactly ticket
- * 12's — same checks, same cues, same "Start anyway" — just without the
+ * 12's — same checks, same cues, same timeout — just without the
  * Overview/Form Guides/Countdown phases around it that make no sense for a
  * quick, one-off run.
  */
 class BeforeYouStartEngine(
     private val unseenGuides: List<TrackedExercise>,
-    /** Quick Count's configuration (ticket 14; callers should prefer the [forQuickCount] factory over passing this directly): starts directly at [BeforeYouStartPhase.PositionCheck] and, once it passes (or "Start anyway" is used), goes straight to [BeforeYouStartPhase.Ready] instead of [BeforeYouStartPhase.Countdown]. */
+    /** Quick Count's configuration (ticket 14; callers should prefer the [forQuickCount] factory over passing this directly): starts directly at [BeforeYouStartPhase.PositionCheck] and, once it passes, goes straight to [BeforeYouStartPhase.Ready] instead of [BeforeYouStartPhase.Countdown]. */
     private val quickCount: Boolean = false,
 ) {
     var phase: BeforeYouStartPhase = BeforeYouStartPhase.Overview
@@ -159,12 +165,12 @@ class BeforeYouStartEngine(
             }
         }
 
-        if (stableSeconds >= REQUIRED_STABLE_SECONDS) advance() else publishPositionCheck()
-    }
-
-    /** Proceeds to Countdown despite failing checks, once [START_ANYWAY_AFTER_SECONDS] have passed in the Position Check. Ignored before then, or outside that phase. */
-    fun startAnyway() {
-        if (phase is BeforeYouStartPhase.PositionCheck && secondsElapsed >= START_ANYWAY_AFTER_SECONDS) advance()
+        when {
+            stableSeconds >= REQUIRED_STABLE_SECONDS -> advance()
+            // No one can reliably reach the phone to confirm an imperfect setup — proceed anyway.
+            secondsElapsed >= POSITION_CHECK_TIMEOUT_SECONDS -> advance()
+            else -> publishPositionCheck()
+        }
     }
 
     /** The oldest not-yet-spoken [PositionCue], removing it; null when there's nothing to say. */
@@ -188,7 +194,6 @@ class BeforeYouStartEngine(
         bodyInFrame = lastEvaluation.bodyInFrame,
         distance = lastEvaluation.distance,
         secondsElapsed = secondsElapsed,
-        startAnywayAvailable = secondsElapsed >= START_ANYWAY_AFTER_SECONDS,
     )
 
     /** "Come a bit closer" only once the whole body is in frame: a too-short *visible* skeleton otherwise usually means part of the body is cut off or occluded, not that the Athlete is far away. */
@@ -208,8 +213,8 @@ class BeforeYouStartEngine(
         /** Seconds of every check passing while standing still before the Position Check auto-advances (spec.md story 64). */
         const val REQUIRED_STABLE_SECONDS = 2
 
-        /** Seconds in the Position Check before "Start anyway" appears. */
-        const val START_ANYWAY_AFTER_SECONDS = 15
+        /** Seconds in the Position Check before it proceeds on its own regardless of whether the checks ever passed — see this class's own doc comment. */
+        const val POSITION_CHECK_TIMEOUT_SECONDS = 15
 
         /** An unresolved distance cue is repeated this often — placeholder, tune on device. */
         const val DISTANCE_CUE_REPEAT_SECONDS = 5
