@@ -29,3 +29,17 @@ captures/
 *.keystore
 # Google Services (Firebase) config, per-developer/per-environment
 google-services.json
+# `firebase/agent-skills`-installed skill content — regenerable from
+# skills-lock.json (which IS committed), like a node_modules for skills.
+/.agents/
+# Local real-device test video fixtures (large binaries) used with the
+# debug video-replay pipeline (AppContainer's debug_video.mp4 swap) —
+# not meant to live in git history.
+/testvideos/
+# Ad-hoc device debugging output (uiautomator dumps, one-off screenshots
+# pulled off a device mid-investigation) — not project assets. The
+# README's own screenshots (branded_screen.png, welcome_branded.png, etc.)
+# are tracked separately and unaffected by this.
+/dump.xml
+/screen1.png
+/screen_welcome.png
