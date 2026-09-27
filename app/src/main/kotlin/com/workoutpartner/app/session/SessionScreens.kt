@@ -44,6 +44,7 @@ import com.workoutpartner.core.repcounting.ExerciseProfile
 import com.workoutpartner.core.repcounting.ExerciseProfiles
 import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.app.debug.isDebuggableBuild
+import com.workoutpartner.app.ui.components.FramingBorder
 import com.workoutpartner.app.ui.components.PoseOverlay
 import com.workoutpartner.core.posetracking.RawPoseFrame
 import java.util.UUID
@@ -146,6 +147,7 @@ fun SessionScreen(
     val phase by viewModel.phase.collectAsState()
     val account by viewModel.account.collectAsState()
     val poseFrame by viewModel.poseFrame.collectAsState()
+    val framingCloseness by viewModel.framingCloseness.collectAsState()
 
     Surface(modifier = modifier.fillMaxSize()) {
         when (val current = phase) {
@@ -157,6 +159,7 @@ fun SessionScreen(
                 onFinishSet = viewModel::finishSet,
                 poseFrame = if (showPoseOverlay) poseFrame else null,
                 previewMirrored = viewModel.previewMirrored,
+                framingCloseness = framingCloseness,
             )
             is SessionPhase.SetSummary -> SetSummaryContent(
                 current,
@@ -193,6 +196,15 @@ private fun CountdownContent(phase: SessionPhase.Countdown, modifier: Modifier =
  * tracking toward — read from the engine's own phase rather than
  * recomputed here, so this layout can never drift from what a Good Set
  * actually requires.
+ *
+ * Camera-framing-indicator ticket 03 adds [FramingBorder] here, the same
+ * shared component (and distance-scoring pipeline) ticket 02 built for
+ * Position Check: [framingCloseness] is [SessionViewModel]'s continuously
+ * updated, already-smoothed score, and [SessionPhase.Tracking.trackable] is
+ * the same exercise-aware `TrackingStateMachine` signal (see ADR-0011)
+ * driving the "Lost track of you" banner below — one source of truth for
+ * both. It's drawn as an outline only (no fill), so it never covers the rep
+ * count/target/progress UI it's layered under.
  */
 @Composable
 private fun TrackingContent(
@@ -203,6 +215,8 @@ private fun TrackingContent(
     /** Debug builds only: the latest frame's landmarks, drawn over the preview by [PoseOverlay]. */
     poseFrame: RawPoseFrame?,
     previewMirrored: Boolean,
+    /** [SessionViewModel.framingCloseness] — smoothed every pose frame, unconditionally (ticket 03). */
+    framingCloseness: Float,
     modifier: Modifier = Modifier,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -221,6 +235,7 @@ private fun TrackingContent(
             },
         )
         if (poseFrame != null) PoseOverlay(poseFrame, mirrored = previewMirrored, modifier = Modifier.fillMaxSize())
+        FramingBorder(trackable = phase.trackable, closeness = framingCloseness, modifier = Modifier.fillMaxSize())
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween,

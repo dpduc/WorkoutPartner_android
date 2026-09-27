@@ -7,6 +7,8 @@ import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.workoutpartner.app.framing.FramingScoreSmoother
+import com.workoutpartner.app.framing.FramingScorer
 import com.workoutpartner.app.routines.DifficultyTier
 import com.workoutpartner.app.routines.RoutineDifficulty
 import com.workoutpartner.app.speech.PromptSpeaker
@@ -73,6 +75,11 @@ class SessionViewModel(
     val poseFrame: StateFlow<RawPoseFrame?> = _poseFrame.asStateFlow()
     val previewMirrored: Boolean = poseTracker.mirrorsPreview
 
+    /** [FramingScorer]'s smoothed closeness score, for [com.workoutpartner.app.ui.components.FramingBorder]'s color during Tracking (camera-framing-indicator ticket 03) — fed by the same unconditional [PoseTracker.rawFrames] collection [_poseFrame] uses, so this has data in release builds even though [_poseFrame] itself stays debug-only. */
+    private val framingSmoother = FramingScoreSmoother()
+    private val _framingCloseness = MutableStateFlow(0f)
+    val framingCloseness: StateFlow<Float> = _framingCloseness.asStateFlow()
+
     private val _account = MutableStateFlow<AccountEntity?>(null)
     val account: StateFlow<AccountEntity?> = _account.asStateFlow()
 
@@ -96,8 +103,14 @@ class SessionViewModel(
                 beepIfNewRep()
             }
         }
-        if (showPoseOverlay) {
-            viewModelScope.launch { poseTracker.rawFrames.collect { _poseFrame.value = it } }
+        // Unconditional (camera-framing-indicator ticket 03) — was showPoseOverlay-gated/debug-only,
+        // which left the framing border with no data in release builds. _poseFrame (the debug pose
+        // overlay) stays gated; the framing score below does not.
+        viewModelScope.launch {
+            poseTracker.rawFrames.collect { frame ->
+                if (showPoseOverlay) _poseFrame.value = frame
+                _framingCloseness.value = framingSmoother.next(FramingScorer.evaluate(frame).closeness)
+            }
         }
         viewModelScope.launch {
             poseTracker.errors.collect { message ->
