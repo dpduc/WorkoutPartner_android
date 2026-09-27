@@ -8,6 +8,12 @@
     <string name="reminder_notification_title">Keep your Streak going</string>
     <string name="reminder_notification_text">You haven\'t logged an Active Day yet this week.</string>
 
+    <!-- camera-session-robustness ticket 02: the Foreground Service's
+         persistent notification while camera tracking is active. -->
+    <string name="camera_tracking_channel_name">Workout Tracking</string>
+    <string name="camera_tracking_notification_title">Tracking your workout</string>
+    <string name="camera_tracking_notification_text">Camera is active while you train.</string>
+
     <!-- Ticket 13: the Session's spoken announcements (SessionAnnouncer). -->
     <plurals name="announce_set_start">
         <item quantity="one">%1$s. %2$d rep.</item>

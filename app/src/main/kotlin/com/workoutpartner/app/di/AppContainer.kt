@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.workoutpartner.app.debug.isDebuggableBuild
+import com.workoutpartner.app.notification.CameraTrackingSession
 import com.workoutpartner.core.posetracking.CameraPoseTracker
 import com.workoutpartner.core.posetracking.VideoPoseTracker
 import java.io.File
@@ -86,10 +87,24 @@ class AppContainer(context: Context) {
      * the camera (`adb push` it to `/data/local/tmp`, then
      * `run-as com.workoutpartner.app cp` it into `files/`). Release builds
      * never look for it.
+     *
+     * [CameraPoseTracker] gets [CameraTrackingSession]'s start/stop hooks
+     * (camera-session-robustness ticket 02) wired in here, not inside
+     * `core-pose-tracking` itself — this is the one place allowed to depend
+     * on both. [VideoPoseTracker] gets neither: it has no real camera for a
+     * Foreground Service to protect.
      */
     fun createPoseTracker(): PoseTracker {
         val debugVideo = File(appContext.filesDir, DEBUG_VIDEO_NAME)
-        return if (appContext.isDebuggableBuild() && debugVideo.exists()) VideoPoseTracker(appContext, debugVideo) else CameraPoseTracker(appContext)
+        return if (appContext.isDebuggableBuild() && debugVideo.exists()) {
+            VideoPoseTracker(appContext, debugVideo)
+        } else {
+            CameraPoseTracker(
+                appContext,
+                onCameraSessionStarted = CameraTrackingSession::trackerStarted,
+                onCameraSessionStopped = CameraTrackingSession::trackerStopped,
+            )
+        }
     }
 
     private companion object {

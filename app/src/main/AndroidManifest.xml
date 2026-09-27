@@ -15,6 +15,13 @@
          at all — requested from MainActivity, same pattern as CAMERA. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- camera-session-robustness ticket 02: CameraTrackingService keeps the
+         camera alive if the app briefly leaves the foreground mid-Session
+         (a call, a notification tap-away). Android 14+ throws a
+         SecurityException from startForeground() without both of these. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+
     <!-- Firebase Auth and Cloud Firestore sync -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -36,6 +43,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- camera-session-robustness ticket 02. -->
+        <service
+            android:name=".notification.CameraTrackingService"
+            android:foregroundServiceType="camera"
+            android:exported="false" />
 
         <!-- Ticket 12: WorkManager's default auto-initializer runs before
              Application.onCreate() (a ContentProvider's onCreate() runs

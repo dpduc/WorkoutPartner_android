@@ -3,14 +3,19 @@ package com.workoutpartner.core.posetracking
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.CameraState
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.Observer
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
@@ -34,14 +39,59 @@ import kotlinx.coroutines.flow.callbackFlow
  * JUnit fixtures instead. This class, and its dependence on [MODEL_ASSET_PATH]
  * actually being bundled, is unverified against a real build in this session
  * (no JDK/Android SDK toolchain was available) — see this ticket's Comments.
+ *
+ * [onCameraSessionStarted]/[onCameraSessionStopped] (camera-session-robustness
+ * ticket 02) fire once the camera has actually bound and once [stop] tears
+ * that down, letting a caller run a Foreground Service for as long as this
+ * class genuinely has the camera open — without `core-pose-tracking`
+ * depending on that app-module concern itself. Default to no-ops so nothing
+ * outside `app`'s composition root has to know they exist.
+ *
+ * Camera-session-robustness ticket 03: once bound, also observes the bound
+ * `Camera`'s `CameraInfo.cameraState` and reacts to the camera being lost
+ * mid-session — `analyzeFrame` otherwise just silently stops being called,
+ * with nothing telling the rest of the app anything is wrong. A recoverable
+ * loss ([CameraState.ErrorType.RECOVERABLE] — another app briefly grabbed
+ * the camera, e.g.) gets a bounded, backed-off retry via [retryPolicy]; an
+ * unrecoverable one, or a recoverable one that's retried too many times
+ * already, is reported through [errors] like any other failure. This never
+ * touches [trackingStateMachine] — a person stepping out of frame is a
+ * `CameraState.Type.OPEN` camera producing empty-ish frames, structurally
+ * indistinguishable at this layer from any other frame content, so it can
+ * never be mistaken for a camera loss here.
  */
-class CameraPoseTracker(private val context: Context) : PoseTracker {
+class CameraPoseTracker(
+    private val context: Context,
+    private val onCameraSessionStarted: (context: Context, onStartFailure: (String) -> Unit) -> Unit = { _, _ -> },
+    private val onCameraSessionStopped: (context: Context) -> Unit = {},
+) : PoseTracker {
 
     private var cameraProvider: ProcessCameraProvider? = null
     private var poseLandmarker: PoseLandmarker? = null
     private val trackingStateMachine = TrackingStateMachine()
     private var emitSignal: ((PoseTrackingSignal) -> Unit)? = null
     private var emitError: ((String) -> Unit)? = null
+    /** Whether [onCameraSessionStarted] actually fired — so [stop] only calls [onCameraSessionStopped] for a session that really started (e.g. never called if the camera never bound). */
+    private var cameraSessionActive = false
+
+    // Ticket 03's reconnect state. [boundLifecycleOwner]/[boundSurfaceProvider] are
+    // start()'s own params, kept around so a retry can re-run the same bind path
+    // without the caller having to call start() again itself.
+    private val retryPolicy = CameraRetryPolicy()
+    private val retryHandler = Handler(Looper.getMainLooper())
+    private var pendingRetry: Runnable? = null
+    private var boundLifecycleOwner: LifecycleOwner? = null
+    private var boundSurfaceProvider: Preview.SurfaceProvider? = null
+
+    // A single, stable Observer instance — reused across every bind (including
+    // every retry) so [observedCameraState] can actually remove it again before
+    // the next bind. A method reference like `::handleCameraState` passed
+    // straight to `LiveData.observe` gets SAM-converted to a *new* adapter object
+    // every call, so `removeObserver` with a fresh reference would never match
+    // the one already registered — this field exists specifically to avoid that.
+    private val cameraStateObserver = Observer<CameraState> { state -> handleCameraState(state) }
+    /** The `CameraInfo.cameraState` LiveData [cameraStateObserver] is currently registered on, so [bindCamera]/[stop] can detach it from the *previous* bind before attaching to a new one. */
+    private var observedCameraState: LiveData<CameraState>? = null
 
     override val signals: Flow<PoseTrackingSignal> = callbackFlow {
         emitSignal = { trySend(it) }
@@ -81,30 +131,19 @@ class CameraPoseTracker(private val context: Context) : PoseTracker {
             }
         }
 
+        // A fresh start() means a fresh retry budget — a loss from a previous bind
+        // (or a previous, now-superseded Session/Quick Count run reusing this same
+        // instance) shouldn't count against this one.
+        retryPolicy.reset()
+        boundLifecycleOwner = lifecycleOwner
+        boundSurfaceProvider = previewSurfaceProvider
+
         val providerFuture = ProcessCameraProvider.getInstance(context)
         providerFuture.addListener(
             {
                 try {
-                    val provider = providerFuture.get()
-                    cameraProvider = provider
-
-                    val preview = Preview.Builder().build().apply {
-                        setSurfaceProvider(previewSurfaceProvider)
-                    }
-
-                    val analysis = ImageAnalysis.Builder()
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                        .build()
-                        .also { it.setAnalyzer(ContextCompat.getMainExecutor(context), ::analyzeFrame) }
-
-                    provider.unbindAll()
-                    provider.bindToLifecycle(
-                        lifecycleOwner,
-                        CameraSelector.DEFAULT_FRONT_CAMERA,
-                        preview,
-                        analysis,
-                    )
+                    cameraProvider = providerFuture.get()
+                    bindCamera(lifecycleOwner, previewSurfaceProvider)
                 } catch (e: Exception) {
                     emitError?.invoke(e.message ?: "Couldn't start the camera.")
                 }
@@ -113,11 +152,115 @@ class CameraPoseTracker(private val context: Context) : PoseTracker {
         )
     }
 
+    /**
+     * The actual bind call, shared by [start] and by [handleCameraState]'s retry
+     * path — a reconnect is "do the same bind again," not a separate code path.
+     * Must run on the main thread: `LiveData.observe` requires it, and this is
+     * always called either from `start()`'s [ProcessCameraProvider] listener
+     * (already main-thread, via `ContextCompat.getMainExecutor`) or from
+     * [retryHandler]'s own delayed callback (main-thread `Looper` by construction).
+     */
+    private fun bindCamera(lifecycleOwner: LifecycleOwner, previewSurfaceProvider: Preview.SurfaceProvider) {
+        val provider = cameraProvider ?: return
+        try {
+            val preview = Preview.Builder().build().apply {
+                setSurfaceProvider(previewSurfaceProvider)
+            }
+
+            val analysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                .build()
+                .also { it.setAnalyzer(ContextCompat.getMainExecutor(context), ::analyzeFrame) }
+
+            provider.unbindAll()
+            val camera = provider.bindToLifecycle(
+                lifecycleOwner,
+                CameraSelector.DEFAULT_FRONT_CAMERA,
+                preview,
+                analysis,
+            )
+            // A fresh Camera per bind means a fresh CameraState LiveData — but the
+            // *previous* bind's LiveData doesn't just go away on its own: it can still
+            // fire its own CLOSING/CLOSED transition after unbindAll(), so the old
+            // observer has to be removed explicitly, not just left to be superseded.
+            observedCameraState?.removeObserver(cameraStateObserver)
+            val cameraState = camera.cameraInfo.cameraState
+            observedCameraState = cameraState
+            cameraState.observe(lifecycleOwner, cameraStateObserver)
+
+            if (!cameraSessionActive) {
+                onCameraSessionStarted(context) { message -> emitError?.invoke(message) }
+                cameraSessionActive = true
+            }
+        } catch (e: Exception) {
+            emitError?.invoke(e.message ?: "Couldn't start the camera.")
+        }
+    }
+
+    /**
+     * Ticket 03: reacts to the bound camera's own state, never to frame content
+     * (that's [trackingStateMachine]'s job, fed from [analyzeFrame] instead).
+     */
+    private fun handleCameraState(state: CameraState) {
+        val error = state.error
+        if (error == null) {
+            // Type.OPEN with no error is a healthy camera — including "healthy again
+            // after a retry succeeded," which is exactly when the budget should reset.
+            if (state.type == CameraState.Type.OPEN) retryPolicy.reset()
+            return
+        }
+
+        if (error.type != CameraState.ErrorType.RECOVERABLE) {
+            reportPermanentCameraLoss(error)
+            return
+        }
+
+        val backoffMs = retryPolicy.onRecoverableError()
+        if (backoffMs == null) {
+            reportPermanentCameraLoss(error)
+            return
+        }
+
+        val owner = boundLifecycleOwner
+        val surfaceProvider = boundSurfaceProvider
+        if (owner == null || surfaceProvider == null) return // stop() already ran; nothing to reconnect
+
+        cameraProvider?.unbindAll()
+        val retry = Runnable { bindCamera(owner, surfaceProvider) }
+        pendingRetry = retry
+        retryHandler.postDelayed(retry, backoffMs)
+    }
+
+    /**
+     * Retries exhausted, or the error was never recoverable to begin with — report
+     * it the same way a startup bind failure already is (`errors`, terminal per
+     * [PoseTracker.errors]'s own doc comment), then tear this instance down for
+     * real so a dead-camera session doesn't keep [onCameraSessionStopped] from
+     * ever firing (e.g. leaving the Foreground Service notification up with no
+     * camera actually behind it). [stop] is safe to call again later from the
+     * caller's own cleanup (`PoseTracker.stop`'s doc comment already promises this).
+     */
+    private fun reportPermanentCameraLoss(error: CameraState.StateError) {
+        emitError?.invoke("Lost connection to the camera (error ${error.code}).")
+        stop()
+    }
+
     override fun stop() {
+        pendingRetry?.let(retryHandler::removeCallbacks)
+        pendingRetry = null
+        boundLifecycleOwner = null
+        boundSurfaceProvider = null
+        observedCameraState?.removeObserver(cameraStateObserver)
+        observedCameraState = null
         cameraProvider?.unbindAll()
         cameraProvider = null
         poseLandmarker?.close()
         poseLandmarker = null
+        if (cameraSessionActive) {
+            onCameraSessionStopped(context)
+            cameraSessionActive = false
+        }
     }
 
     private fun analyzeFrame(imageProxy: ImageProxy) {
