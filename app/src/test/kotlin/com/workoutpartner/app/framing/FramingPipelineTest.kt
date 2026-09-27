@@ -140,6 +140,31 @@ class FramingPipelineTest {
         assertTrue("one bad frame shouldn't crash the score to 0", afterOutlier > 0.5f)
     }
 
+    // --- FramingScoreSmoother.next(RawPoseFrame) — the shared score-then-smooth glue used by
+    // PositionCheckScreen, SessionViewModel and QuickCountViewModel (camera-framing-indicator
+    // tickets 02-04) ---
+
+    @Test
+    fun `next(frame) scores the frame through FramingScorer before smoothing it`() {
+        val idealHeight = (FramingScorer.MIN_SKELETON_HEIGHT_FRACTION + FramingScorer.MAX_SKELETON_HEIGHT_FRACTION) / 2f
+        val viaHelper = FramingScoreSmoother().next(frame(topY = 0f, bottomY = idealHeight))
+        val viaManualGlue = FramingScoreSmoother().next(FramingScorer.evaluate(frame(topY = 0f, bottomY = idealHeight)).closeness)
+
+        assertEquals(viaManualGlue, viaHelper, 0.001f)
+    }
+
+    @Test
+    fun `next(frame) smooths across repeated calls just like next(rawScore)`() {
+        val idealHeight = (FramingScorer.MIN_SKELETON_HEIGHT_FRACTION + FramingScorer.MAX_SKELETON_HEIGHT_FRACTION) / 2f
+        val smoother = FramingScoreSmoother(smoothingFactor = 0.2f)
+        smoother.next(frame(topY = 0.3f, bottomY = 0.31f)) // far from ideal, low closeness
+
+        val result = smoother.next(frame(topY = 0f, bottomY = idealHeight)) // ideal, closeness == 1.0
+
+        assertTrue("should move toward the new sample...", result > 0f)
+        assertTrue("...but not jump all the way to it", result < 1f)
+    }
+
     // --- FramingColor ---
 
     @Test

@@ -136,7 +136,7 @@ fun QuickCountScreen(
  * The Quick Count run itself: camera + live counter, auto-stopping at the
  * target or manually via [QuickCountViewModel.stop]. Camera-framing-indicator
  * ticket 04 layers the same live [FramingBorder] Position Check and Session
- * Tracking use over the preview here, driven by [QuickCountViewModel.closeness]
+ * Tracking use over the preview here, driven by [QuickCountViewModel.framingCloseness]
  * (smoothed from [PoseTracker.rawFrames]) and the current phase's
  * [QuickCountPhase.Running.trackable] (already exercise-aware, from
  * [PoseTracker.signals] via [QuickCountEngine]) — distance never gates
@@ -170,7 +170,7 @@ fun QuickCountRunScreen(
     )
     val phase by viewModel.phase.collectAsState()
     val durationSeconds by viewModel.durationSeconds.collectAsState()
-    val closeness by viewModel.closeness.collectAsState()
+    val framingCloseness by viewModel.framingCloseness.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // This ViewModel is Activity-scoped (see its own release() doc comment) — without this,
@@ -195,7 +195,7 @@ fun QuickCountRunScreen(
                 // Camera-framing-indicator ticket 04: the same shared border Position Check and Session
                 // Tracking use, drawn as an outline only (Stroke, not a fill) so it never obstructs the
                 // rep count/target UI drawn on top of it below.
-                FramingBorder(trackable = current.trackable, closeness = closeness, modifier = Modifier.fillMaxSize())
+                FramingBorder(trackable = current.trackable, closeness = framingCloseness, modifier = Modifier.fillMaxSize())
                 Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
                     if (!current.trackable) {
                         Card(modifier = Modifier.fillMaxWidth()) {

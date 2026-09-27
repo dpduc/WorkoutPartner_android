@@ -1,5 +1,7 @@
 package com.workoutpartner.app.framing
 
+import com.workoutpartner.core.posetracking.RawPoseFrame
+
 /**
  * Exponential moving average over [FramingScorer]'s raw per-frame
  * [FramingDistance.closeness] score, so the border's color drifts across a
@@ -25,3 +27,14 @@ class FramingScoreSmoother(private val smoothingFactor: Float = DEFAULT_SMOOTHIN
         const val DEFAULT_SMOOTHING_FACTOR = 0.2f
     }
 }
+
+/**
+ * Convenience overload of [FramingScoreSmoother.next] for the three
+ * camera-facing call sites (`PositionCheckScreen`, `SessionViewModel`,
+ * `QuickCountViewModel`): scores [frame] through [FramingScorer] and feeds
+ * the result straight into this smoother, so that two-step glue — score,
+ * then smooth — isn't each written out independently wherever a
+ * [RawPoseFrame] needs to become [com.workoutpartner.app.ui.components.FramingBorder]'s
+ * smoothed closeness input (camera-framing-indicator tickets 02-04).
+ */
+fun FramingScoreSmoother.next(frame: RawPoseFrame): Float = next(FramingScorer.evaluate(frame).closeness)

@@ -28,7 +28,7 @@ import com.workoutpartner.app.R
 import com.workoutpartner.app.debug.isDebuggableBuild
 import com.workoutpartner.app.framing.DistanceStatus
 import com.workoutpartner.app.framing.FramingScoreSmoother
-import com.workoutpartner.app.framing.FramingScorer
+import com.workoutpartner.app.framing.next
 import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.app.ui.components.FramingBorder
 import com.workoutpartner.app.ui.components.PoseOverlay
@@ -85,7 +85,7 @@ fun PositionCheckScreen(
     val showPoseOverlay = remember { context.isDebuggableBuild() }
     var lastFrame by remember { mutableStateOf<RawPoseFrame?>(null) }
     var trackable by remember { mutableStateOf(false) }
-    var closeness by remember { mutableStateOf(0f) }
+    var framingCloseness by remember { mutableStateOf(0f) }
     val smoother = remember { FramingScoreSmoother() }
 
     fun publish() {
@@ -109,7 +109,7 @@ fun PositionCheckScreen(
             poseTracker.rawFrames.collect { frame ->
                 engine.onPoseFrame(frame)
                 if (showPoseOverlay) lastFrame = frame
-                closeness = smoother.next(FramingScorer.evaluate(frame).closeness)
+                framingCloseness = smoother.next(frame)
                 publish()
             }
         }
@@ -139,7 +139,7 @@ fun PositionCheckScreen(
             factory = { previewView },
         )
         if (showPoseOverlay) PoseOverlay(lastFrame, mirrored = poseTracker.mirrorsPreview, modifier = Modifier.fillMaxSize())
-        FramingBorder(trackable = trackable, closeness = closeness, modifier = Modifier.fillMaxSize())
+        FramingBorder(trackable = trackable, closeness = framingCloseness, modifier = Modifier.fillMaxSize())
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween,

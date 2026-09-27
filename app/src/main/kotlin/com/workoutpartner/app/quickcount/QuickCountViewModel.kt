@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.workoutpartner.app.framing.FramingScoreSmoother
 import com.workoutpartner.app.framing.FramingScorer
+import com.workoutpartner.app.framing.next
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.core.repcounting.Exercise
 import com.workoutpartner.data.TallyRepository
@@ -29,7 +30,7 @@ import java.time.Instant
  *
  * Camera-framing-indicator ticket 04 additionally collects [PoseTracker.rawFrames]
  * (new — this class had no use for them before) through a [FramingScoreSmoother]
- * into [closeness], so [QuickCountRunScreen] can drive the shared
+ * into [framingCloseness], so [QuickCountRunScreen] can drive the shared
  * [com.workoutpartner.app.ui.components.FramingBorder] the same way
  * `PositionCheckScreen` already does; [QuickCountPhase.Running.trackable]
  * (already collected from [PoseTracker.signals] via [QuickCountEngine]) is
@@ -59,8 +60,8 @@ class QuickCountViewModel(
     private val smoother = FramingScoreSmoother()
 
     /** [FramingScorer]'s continuous distance-closeness score, smoothed across [poseTracker]'s [PoseTracker.rawFrames] — feeds the run screen's [com.workoutpartner.app.ui.components.FramingBorder] color (camera-framing-indicator ticket 04). */
-    private val _closeness = MutableStateFlow(0f)
-    val closeness: StateFlow<Float> = _closeness.asStateFlow()
+    private val _framingCloseness = MutableStateFlow(0f)
+    val framingCloseness: StateFlow<Float> = _framingCloseness.asStateFlow()
 
     private var tallySaved = false
 
@@ -74,7 +75,7 @@ class QuickCountViewModel(
         }
         viewModelScope.launch {
             poseTracker.rawFrames.collect { frame ->
-                _closeness.value = smoother.next(FramingScorer.evaluate(frame).closeness)
+                _framingCloseness.value = smoother.next(frame)
             }
         }
         viewModelScope.launch {

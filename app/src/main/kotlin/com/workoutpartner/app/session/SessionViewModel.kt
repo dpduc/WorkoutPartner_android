@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.workoutpartner.app.framing.FramingScoreSmoother
 import com.workoutpartner.app.framing.FramingScorer
+import com.workoutpartner.app.framing.next
 import com.workoutpartner.app.routines.DifficultyTier
 import com.workoutpartner.app.routines.RoutineDifficulty
 import com.workoutpartner.app.speech.PromptSpeaker
@@ -109,7 +110,7 @@ class SessionViewModel(
         viewModelScope.launch {
             poseTracker.rawFrames.collect { frame ->
                 if (showPoseOverlay) _poseFrame.value = frame
-                _framingCloseness.value = framingSmoother.next(FramingScorer.evaluate(frame).closeness)
+                _framingCloseness.value = framingSmoother.next(frame)
             }
         }
         viewModelScope.launch {
