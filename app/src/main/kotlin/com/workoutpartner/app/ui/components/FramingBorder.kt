@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -42,7 +43,19 @@ fun FramingBorder(trackable: Boolean, closeness: Float, modifier: Modifier = Mod
     }
 
     Canvas(modifier = modifier) {
-        drawRect(color = animatedColor, size = Size(size.width, size.height), style = stroke)
+        // Inset by a full stroke width on each side: a rect drawn exactly at the
+        // canvas's own boundary would straddle it with a centered Stroke, putting
+        // half the stroke's width right at the literal screen edge — where this
+        // device's own edge compositing (confirmed present via on-device testing,
+        // independent of anything this app draws) swallows it, making the border
+        // functionally invisible against real content. Insetting keeps the whole
+        // stroke safely inside the canvas, regardless of any edge effect.
+        drawRect(
+            color = animatedColor,
+            topLeft = Offset(STROKE_WIDTH, STROKE_WIDTH),
+            size = Size(size.width - 2 * STROKE_WIDTH, size.height - 2 * STROKE_WIDTH),
+            style = stroke,
+        )
     }
 }
 
