@@ -1,15 +1,19 @@
 package com.workoutpartner.app.beforeyoustart
 
+import com.workoutpartner.app.framing.DistanceStatus
+import com.workoutpartner.app.framing.FramingScorer
 import com.workoutpartner.app.progress.TrackedExercise
 import com.workoutpartner.core.posetracking.RawPoseFrame
 
 /**
  * Where the Position Check (`workout-partner-v3` ticket 12) currently stands
- * — what the screen's "whole body in frame"/"distance OK" indicators render.
- * [secondsElapsed] counts engine ticks spent in the phase.
+ * — what the screen's distance indicator renders. [secondsElapsed] counts
+ * engine ticks spent in the phase. Camera-framing-indicator ticket 02
+ * retired this phase's own whole-body-in-frame readiness check (the screen
+ * now reads that straight off `poseTracker.signals` instead — see
+ * ADR-0011), so this only carries the distance half of what it used to.
  */
 data class PositionCheckStatus(
-    val bodyInFrame: Boolean,
     val distance: DistanceStatus,
     val secondsElapsed: Int,
 )
@@ -78,7 +82,7 @@ class BeforeYouStartEngine(
     var phase: BeforeYouStartPhase = BeforeYouStartPhase.Overview
         private set
 
-    private var lastEvaluation = FrameEvaluation(bodyInFrame = false, distance = DistanceStatus.UNKNOWN)
+    private var lastDistance: DistanceStatus = DistanceStatus.UNKNOWN
     /** The frame stillness is measured against: the previous window's last frame (the first frame ever, before that) — not the previous frame, so slow drift and sway (tiny per frame at ~30fps) still add up to movement. */
     private var windowAnchorFrame: RawPoseFrame? = null
     private var latestFrame: RawPoseFrame? = null
@@ -114,28 +118,27 @@ class BeforeYouStartEngine(
     /** Evaluates one camera frame against the Position Check's checks; ignored outside [BeforeYouStartPhase.PositionCheck]. */
     fun onPoseFrame(frame: RawPoseFrame) {
         if (phase !is BeforeYouStartPhase.PositionCheck) return
-        val evaluation = PositionCheckEvaluator.evaluate(frame)
+        val distance = FramingScorer.evaluate(frame).status
 
         val anchor = windowAnchorFrame
         if (anchor == null) windowAnchorFrame = frame else if (!PositionCheckEvaluator.isStill(anchor, frame)) movedSinceTick = true
         latestFrame = frame
         frameSinceTick = true
-        if (!evaluation.allChecksPass) checkFailedSinceTick = true
+        if (distance != DistanceStatus.OK) checkFailedSinceTick = true
 
-        // "Body detected" is spoken once per Position Check, not on every flicker of the in-frame count.
-        if (evaluation.bodyInFrame && !bodyDetectedAnnounced) {
+        // "Body detected" is spoken once per Position Check, not on every flicker of a marginal distance reading.
+        if (distance != DistanceStatus.UNKNOWN && !bodyDetectedAnnounced) {
             bodyDetectedAnnounced = true
             cues.addLast(PositionCue.BODY_DETECTED)
         }
-        val distanceCue = distanceCueFor(evaluation)
+        val distanceCue = distanceCueFor(distance)
         if (distanceCue != null && distanceCue != lastDistanceCue) {
             cues.addLast(distanceCue)
             secondsSinceDistanceCue = 0
         }
-        // A merely suppressed cue (too far, but body not fully in frame) keeps the previous one, so
-        // flicker across that boundary doesn't re-announce it; only a passing distance clears it.
-        lastDistanceCue = distanceCue ?: if (evaluation.distance == DistanceStatus.OK) null else lastDistanceCue
-        lastEvaluation = evaluation
+        // A repeated failure of the same kind doesn't re-announce; only a passing distance clears it.
+        lastDistanceCue = distanceCue ?: if (distance == DistanceStatus.OK) null else lastDistanceCue
+        lastDistance = distance
 
         publishPositionCheck()
     }
@@ -191,15 +194,13 @@ class BeforeYouStartEngine(
     }
 
     private fun currentStatus() = PositionCheckStatus(
-        bodyInFrame = lastEvaluation.bodyInFrame,
-        distance = lastEvaluation.distance,
+        distance = lastDistance,
         secondsElapsed = secondsElapsed,
     )
 
-    /** "Come a bit closer" only once the whole body is in frame: a too-short *visible* skeleton otherwise usually means part of the body is cut off or occluded, not that the Athlete is far away. */
-    private fun distanceCueFor(evaluation: FrameEvaluation): PositionCue? = when {
-        evaluation.distance == DistanceStatus.TOO_CLOSE -> PositionCue.STEP_BACK
-        evaluation.distance == DistanceStatus.TOO_FAR && evaluation.bodyInFrame -> PositionCue.MOVE_CLOSER
+    private fun distanceCueFor(distance: DistanceStatus): PositionCue? = when (distance) {
+        DistanceStatus.TOO_CLOSE -> PositionCue.STEP_BACK
+        DistanceStatus.TOO_FAR -> PositionCue.MOVE_CLOSER
         else -> null
     }
 

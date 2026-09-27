@@ -1,11 +1,11 @@
 package com.workoutpartner.app.beforeyoustart
 
+import com.workoutpartner.app.framing.DistanceStatus
 import com.workoutpartner.app.progress.TrackedExercise
 import com.workoutpartner.core.posetracking.RawPoseFrame
 import com.workoutpartner.core.posetracking.RawPoseLandmark
 import com.workoutpartner.core.repcounting.Exercise
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -92,36 +92,17 @@ class BeforeYouStartEngineTest {
         val engine = enginePastFormGuides()
 
         assertEquals(
-            PositionCheckStatus(bodyInFrame = false, distance = DistanceStatus.UNKNOWN, secondsElapsed = 0),
+            PositionCheckStatus(distance = DistanceStatus.UNKNOWN, secondsElapsed = 0),
             positionCheck(engine),
         )
     }
 
     @Test
-    fun `reports a body out of frame when fewer than 28 of 33 landmarks are confident`() {
-        val engine = enginePastFormGuides()
-
-        engine.onPoseFrame(frame(confidentCount = 27))
-
-        assertFalse(positionCheck(engine).bodyInFrame)
-    }
-
-    @Test
-    fun `reports a body in frame once at least 28 of 33 landmarks are confident`() {
-        val engine = enginePastFormGuides()
-
-        engine.onPoseFrame(frame(confidentCount = 28))
-
-        assertTrue(positionCheck(engine).bodyInFrame)
-    }
-
-    @Test
-    fun `an empty frame with no pose detected is out of frame with unknown distance`() {
+    fun `an empty frame with no pose detected has unknown distance`() {
         val engine = enginePastFormGuides()
 
         engine.onPoseFrame(RawPoseFrame(emptyList()))
 
-        assertEquals(false, positionCheck(engine).bodyInFrame)
         assertEquals(DistanceStatus.UNKNOWN, positionCheck(engine).distance)
     }
 
