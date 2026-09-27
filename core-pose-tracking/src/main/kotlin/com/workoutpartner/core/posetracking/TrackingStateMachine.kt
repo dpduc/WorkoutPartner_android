@@ -1,5 +1,6 @@
 package com.workoutpartner.core.posetracking
 
+import com.workoutpartner.core.repcounting.ExerciseProfile
 import com.workoutpartner.core.repcounting.PoseLandmarkFrame
 
 /**
@@ -8,11 +9,26 @@ import com.workoutpartner.core.repcounting.PoseLandmarkFrame
  * without flapping to [PoseTrackingSignal.Lost] on a single dropped frame
  * (motion blur, one bad frame) or resuming on a single lucky one.
  *
- * A frame counts as untracked once fewer than [minimumTrackedLandmarks] of
- * the six generic joints came back from [PoseFrameMapper] — not only when
- * the map is fully empty. That covers the ticket's "steps out of frame
- * **or is occluded**" both ways: a fully missing subject and a mostly (but
- * not completely) occluded one both degrade to too few usable joints.
+ * A frame counts as untracked once it's missing any of the *current*
+ * [ExerciseProfile]'s three joints ([ExerciseProfile.jointA],
+ * [ExerciseProfile.vertex], [ExerciseProfile.jointC]) — not a fixed count of
+ * the six generic [com.workoutpartner.core.repcounting.Landmark]s
+ * (camera-framing-indicator ticket 01; see ADR-0011). This is deliberately
+ * the same gate [com.workoutpartner.core.repcounting.RepCounter.process]
+ * already applies via [com.workoutpartner.core.repcounting.Angle.between]
+ * (all three joints or nothing) — so a frame this machine reports
+ * [PoseTrackingSignal.Trackable] for is, joint-wise, exactly a frame the Rep
+ * Counting Engine can actually turn into an angle, not a looser or stricter
+ * guess at it. [PoseLandmarkFrame] arrives already side-resolved by
+ * [PoseFrameMapper] (one entry per generic
+ * [com.workoutpartner.core.repcounting.Landmark]), so no left/right picking
+ * happens here — this is just presence-checking the three joints the
+ * current profile names.
+ *
+ * The current profile can be swapped mid-instance via [updateProfile] — e.g.
+ * a Session moving from one Set's Exercise into the next's — without
+ * resetting [state] or either consecutive-frame counter; only which joints
+ * count toward "tracked" changes, starting from the very next [accept] call.
  *
  * Not itself responsible for skipping partial Reps — a [PoseLandmarkFrame]
  * is only ever handed to the Rep Counting Engine while this machine reports
@@ -25,17 +41,31 @@ import com.workoutpartner.core.repcounting.PoseLandmarkFrame
  * state machine.
  */
 class TrackingStateMachine(
+    initialProfile: ExerciseProfile,
     private val lostAfterConsecutiveUntrackedFrames: Int = DEFAULT_LOST_AFTER_FRAMES,
     private val resumeAfterConsecutiveTrackedFrames: Int = DEFAULT_RESUME_AFTER_FRAMES,
-    private val minimumTrackedLandmarks: Int = DEFAULT_MINIMUM_TRACKED_LANDMARKS,
 ) {
+    private var profile: ExerciseProfile = initialProfile
     private var state: State = State.Trackable
     private var consecutiveUntracked = 0
     private var consecutiveTracked = 0
 
+    /**
+     * Swaps which [ExerciseProfile]'s joints [accept] checks against, from
+     * this point forward — e.g. a Routine's next Set starting a different
+     * Exercise. Deliberately leaves [state] and both consecutive-frame
+     * counters untouched: this is a change to *what* counts as tracked, not
+     * a fresh camera session, so any Lost/Trackable debounce already in
+     * progress keeps running exactly as it was.
+     */
+    fun updateProfile(profile: ExerciseProfile) {
+        this.profile = profile
+    }
+
     /** Feed the next analyzed camera frame's mapping. */
     fun accept(frame: PoseLandmarkFrame): PoseTrackingSignal {
-        if (frame.landmarks.size >= minimumTrackedLandmarks) {
+        val requiredLandmarks = setOf(profile.jointA, profile.vertex, profile.jointC)
+        if (frame.landmarks.keys.containsAll(requiredLandmarks)) {
             consecutiveTracked++
             consecutiveUntracked = 0
         } else {
@@ -60,8 +90,5 @@ class TrackingStateMachine(
 
         /** A couple of good frames before resuming, so a single flicker right after a real loss doesn't bounce the banner. */
         const val DEFAULT_RESUME_AFTER_FRAMES = 2
-
-        /** At least half of the six generic joints ([com.workoutpartner.core.repcounting.Landmark] has six) must be tracked for a frame to count as usable. */
-        const val DEFAULT_MINIMUM_TRACKED_LANDMARKS = 3
     }
 }

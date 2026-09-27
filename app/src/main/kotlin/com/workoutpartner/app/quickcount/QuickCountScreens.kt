@@ -39,6 +39,8 @@ import com.workoutpartner.app.beforeyoustart.PositionCheckScreen
 import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.core.repcounting.Exercise
+import com.workoutpartner.core.repcounting.ExerciseProfile
+import com.workoutpartner.core.repcounting.ExerciseProfiles
 import com.workoutpartner.data.TallyRepository
 import com.workoutpartner.data.TrackedProfileEntity
 import java.util.UUID
@@ -96,7 +98,8 @@ fun QuickCountScreen(
     exercise: Exercise,
     target: Int?,
     tallyRepository: TallyRepository,
-    poseTrackerFactory: () -> PoseTracker,
+    /** Creates the camera-backed tracker, given the initial [ExerciseProfile] to check joints against (camera-framing-indicator ticket 01) — always [exercise] here, since a Quick Count run tracks one Exercise start to finish. */
+    poseTrackerFactory: (ExerciseProfile) -> PoseTracker,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -105,11 +108,12 @@ fun QuickCountScreen(
     val context = LocalContext.current
     val speaker = remember { PromptSpeaker(context) }
     DisposableEffect(speaker) { onDispose { speaker.shutdown() } }
+    val profile = remember(exercise) { ExerciseProfiles.forExercise(exercise) }
 
     if (phase is BeforeYouStartPhase.PositionCheck) {
         PositionCheckScreen(
             engine = engine,
-            poseTracker = remember { poseTrackerFactory() },
+            poseTracker = remember { poseTrackerFactory(profile) },
             speaker = speaker,
             onPhaseChanged = { phase = engine.phase },
             modifier = modifier,
@@ -134,7 +138,8 @@ fun QuickCountRunScreen(
     exercise: Exercise,
     target: Int?,
     tallyRepository: TallyRepository,
-    poseTrackerFactory: () -> PoseTracker,
+    /** Creates the camera-backed tracker, given the initial [ExerciseProfile] to check joints against (camera-framing-indicator ticket 01) — always [exercise] here, since a Quick Count run tracks one Exercise start to finish. */
+    poseTrackerFactory: (ExerciseProfile) -> PoseTracker,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -144,11 +149,12 @@ fun QuickCountRunScreen(
     // never actually start a new camera session — same fix SessionScreens.kt already applies
     // for the same reason.
     val viewModelKey = remember { UUID.randomUUID().toString() }
+    val profile = remember(exercise) { ExerciseProfiles.forExercise(exercise) }
     val viewModel: QuickCountViewModel = viewModel(
         key = viewModelKey,
         factory = remember {
             viewModelFactory {
-                initializer { QuickCountViewModel(trackedProfileId, exercise, target, tallyRepository, poseTrackerFactory()) }
+                initializer { QuickCountViewModel(trackedProfileId, exercise, target, tallyRepository, poseTrackerFactory(profile)) }
             }
         },
     )

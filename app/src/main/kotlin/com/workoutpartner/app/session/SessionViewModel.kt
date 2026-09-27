@@ -12,6 +12,7 @@ import com.workoutpartner.app.routines.RoutineDifficulty
 import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.core.posetracking.RawPoseFrame
+import com.workoutpartner.core.repcounting.ExerciseProfiles
 import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.data.AccountEntity
 import com.workoutpartner.data.AccountRepository
@@ -164,8 +165,18 @@ class SessionViewModel(
         if (cameraUnavailable) return
         val previous = _phase.value
         val next = engine.phase
-        if (next::class != previous::class || (next as? SessionPhase.Tracking)?.stepIndex != (previous as? SessionPhase.Tracking)?.stepIndex) {
-            Log.i(TRACE_TAG, "phase: ${previous::class.simpleName} -> ${next::class.simpleName}${(next as? SessionPhase.Tracking)?.let { " (step ${it.stepIndex})" } ?: ""}")
+        val previousStepIndex = (previous as? SessionPhase.Tracking)?.stepIndex
+        val nextStepIndex = (next as? SessionPhase.Tracking)?.stepIndex
+        if (next::class != previous::class || nextStepIndex != previousStepIndex) {
+            Log.i(TRACE_TAG, "phase: ${previous::class.simpleName} -> ${next::class.simpleName}${nextStepIndex?.let { " (step $it)" } ?: ""}")
+        }
+        // The Routine's just-started step's own Exercise/Variant (camera-framing-indicator
+        // ticket 01) — pushed to the tracker so its exercise-aware Trackable/Lost check
+        // (and the future framing indicator) track what's actually being counted right now,
+        // not whatever Set started the Session.
+        if (nextStepIndex != null && nextStepIndex != previousStepIndex) {
+            val step = steps[nextStepIndex]
+            poseTracker.updateExerciseProfile(ExerciseProfiles.forExercise(step.exercise, step.variant))
         }
         _phase.value = next
         announcer.announce(previous, next).forEach(speaker::speak)

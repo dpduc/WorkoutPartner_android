@@ -1,6 +1,7 @@
 package com.workoutpartner.core.posetracking
 
 import com.workoutpartner.core.repcounting.Exercise
+import com.workoutpartner.core.repcounting.ExerciseProfiles
 import com.workoutpartner.core.repcounting.FormScore
 import com.workoutpartner.core.repcounting.RepEvent
 import com.workoutpartner.core.repcounting.RepCounter
@@ -48,7 +49,7 @@ class ClipReplayTest {
 
     private fun replay(resource: String, exercise: Exercise): List<RepEvent> {
         val counter = RepCounter.forExercise(exercise)
-        val tracking = TrackingStateMachine()
+        val tracking = TrackingStateMachine(initialProfile = ExerciseProfiles.forExercise(exercise))
         return readFrames(resource).mapNotNull { raw ->
             val signal = tracking.accept(PoseFrameMapper.toPoseLandmarkFrame(raw))
             if (signal is PoseTrackingSignal.Trackable) counter.process(signal.frame) else null

@@ -9,6 +9,7 @@ import com.workoutpartner.core.posetracking.CameraPoseTracker
 import com.workoutpartner.core.posetracking.VideoPoseTracker
 import java.io.File
 import com.workoutpartner.core.posetracking.PoseTracker
+import com.workoutpartner.core.repcounting.ExerciseProfile
 import com.workoutpartner.data.AccountRepository
 import com.workoutpartner.data.AuthGateway
 import com.workoutpartner.data.AuthRepository
@@ -93,14 +94,23 @@ class AppContainer(context: Context) {
      * `core-pose-tracking` itself — this is the one place allowed to depend
      * on both. [VideoPoseTracker] gets neither: it has no real camera for a
      * Foreground Service to protect.
+     *
+     * [initialProfile] (camera-framing-indicator ticket 01) is the caller's
+     * already-known Exercise/Variant at construction time — Quick Count's own
+     * parameter, a Session's first Set, or Position Check's first Set, the
+     * same way each already reads that for its first-Set announcement. A
+     * Session pushes further updates as it moves between Sets via
+     * [PoseTracker.updateExerciseProfile]; Quick Count and Position Check
+     * never need to, since they track one Exercise for their whole run.
      */
-    fun createPoseTracker(): PoseTracker {
+    fun createPoseTracker(initialProfile: ExerciseProfile): PoseTracker {
         val debugVideo = File(appContext.filesDir, DEBUG_VIDEO_NAME)
         return if (appContext.isDebuggableBuild() && debugVideo.exists()) {
-            VideoPoseTracker(appContext, debugVideo)
+            VideoPoseTracker(appContext, debugVideo, initialProfile)
         } else {
             CameraPoseTracker(
                 appContext,
+                initialProfile = initialProfile,
                 onCameraSessionStarted = CameraTrackingSession::trackerStarted,
                 onCameraSessionStopped = CameraTrackingSession::trackerStopped,
             )

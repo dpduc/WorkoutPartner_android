@@ -40,6 +40,8 @@ import com.workoutpartner.data.RoutineWithSteps
 import com.workoutpartner.data.SetRepository
 import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.core.posetracking.PoseTracker
+import com.workoutpartner.core.repcounting.ExerciseProfile
+import com.workoutpartner.core.repcounting.ExerciseProfiles
 import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.app.debug.isDebuggableBuild
 import com.workoutpartner.app.ui.components.PoseOverlay
@@ -103,7 +105,8 @@ fun SessionScreen(
     accountId: String?,
     setRepository: SetRepository,
     accountRepository: AccountRepository,
-    poseTrackerFactory: () -> PoseTracker,
+    /** Creates the camera-backed tracker for the whole Session, given the initial [ExerciseProfile] to check joints against (camera-framing-indicator ticket 01) — the Routine's first Set's Exercise/Variant. [SessionViewModel] pushes further updates as the Routine moves between Sets. */
+    poseTrackerFactory: (ExerciseProfile) -> PoseTracker,
     difficultyTier: DifficultyTier = DifficultyTier.STANDARD,
     /** The Athlete's Overview toggle choice for this Session's Jumping Jack steps (`workout-partner-v3` ticket 11) — see [SessionViewModel]. */
     jumpingJackVariant: ExerciseVariant? = null,
@@ -116,13 +119,19 @@ fun SessionScreen(
     // started in the same app run would be handed the first (finished) Session's ViewModel and its summary.
     val viewModelKey = remember { UUID.randomUUID().toString() }
     val showPoseOverlay = remember { context.isDebuggableBuild() }
+    // The Routine's first Set's Exercise/Variant (camera-framing-indicator ticket 01) —
+    // the same steps SessionViewModel itself builds from routine/difficultyTier/jumpingJackVariant.
+    val initialProfile = remember(routine, difficultyTier, jumpingJackVariant) {
+        val firstStep = routine.toRoutineSteps(difficultyTier, jumpingJackVariant).first()
+        ExerciseProfiles.forExercise(firstStep.exercise, firstStep.variant)
+    }
     val viewModel: SessionViewModel = viewModel(
         key = viewModelKey,
         factory = remember {
             viewModelFactory {
                 initializer {
                     SessionViewModel(
-                        routine, accountId, setRepository, accountRepository, poseTrackerFactory(),
+                        routine, accountId, setRepository, accountRepository, poseTrackerFactory(initialProfile),
                         showPoseOverlay = showPoseOverlay,
                         speaker = PromptSpeaker(context),
                         phrases = ResourceAnnouncerPhrases(context),

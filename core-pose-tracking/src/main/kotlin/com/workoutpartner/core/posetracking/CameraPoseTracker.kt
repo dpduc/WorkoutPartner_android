@@ -20,6 +20,7 @@ import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
+import com.workoutpartner.core.repcounting.ExerciseProfile
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -62,13 +63,15 @@ import kotlinx.coroutines.flow.callbackFlow
  */
 class CameraPoseTracker(
     private val context: Context,
+    /** The Exercise (or Variant) already known at construction — a Session's first Set, Quick Count's own parameter, or Position Check's first Set (camera-framing-indicator ticket 01). Update it later via [updateExerciseProfile]. */
+    initialProfile: ExerciseProfile,
     private val onCameraSessionStarted: (context: Context, onStartFailure: (String) -> Unit) -> Unit = { _, _ -> },
     private val onCameraSessionStopped: (context: Context) -> Unit = {},
 ) : PoseTracker {
 
     private var cameraProvider: ProcessCameraProvider? = null
     private var poseLandmarker: PoseLandmarker? = null
-    private val trackingStateMachine = TrackingStateMachine()
+    private val trackingStateMachine = TrackingStateMachine(initialProfile)
     private var emitSignal: ((PoseTrackingSignal) -> Unit)? = null
     private var emitError: ((String) -> Unit)? = null
     /** Whether [onCameraSessionStarted] actually fired — so [stop] only calls [onCameraSessionStopped] for a session that really started (e.g. never called if the camera never bound). */
@@ -261,6 +264,10 @@ class CameraPoseTracker(
             onCameraSessionStopped(context)
             cameraSessionActive = false
         }
+    }
+
+    override fun updateExerciseProfile(profile: ExerciseProfile) {
+        trackingStateMachine.updateProfile(profile)
     }
 
     private fun analyzeFrame(imageProxy: ImageProxy) {
