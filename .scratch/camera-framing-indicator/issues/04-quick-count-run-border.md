@@ -9,7 +9,7 @@ user stories 4, 15, 23.
 
 **Blocked by:** 01, 02
 
-**Status:** ready-for-agent (code-complete; on-device verification outstanding — see Comments)
+**Status:** done
 
 - [x] `QuickCountScreens.kt`'s `QuickCountRunScreen` renders ticket 02's
       shared border component, driven by the same shared distance-scoring
@@ -21,12 +21,28 @@ user stories 4, 15, 23.
 - [x] No change to `QuickCountEngine`, rep counting, or Form Score
       computation.
 - [x] Typecheck and the full test suite pass.
-- [ ] On-device verification: a Quick Count run shows the live color border
+- [x] On-device verification: a Quick Count run shows the live color border
       responding to distance, and the dashed/gray state when the run's
-      Exercise's required joints aren't visible. **Not done — no
-      device/emulator available this session.**
+      Exercise's required joints aren't visible.
 
 ## Comments
+
+**On-device verification (Samsung SM-S938B)**, via the debug-video replay
+path (`testvideos/push_up_edge.mp4` as `debug_video.mp4`): both states
+directly confirmed on this exact screen.
+
+- **Push Up run**: solid, continuously-colored border throughout; run
+  completed normally (2 reps, Form Score 50, Tally saved).
+- **Squat run against the same (upper-body-framed) clip**, a deliberate
+  exercise/footage mismatch: border switched to its dashed/gray state and
+  the banner read "Step into frame so we can see you clearly." — confirming
+  the not-Trackable path renders correctly here too, not just the happy path.
+
+This run also surfaced (and ticket 02's own on-device pass fixed) a real bug
+in the shared `FramingBorder` component itself — it was initially invisible
+on this exact screen before the fix in `59d523e`; see ticket 02's Comments
+for the root cause. See ticket 01's Comments for the video-clip-replay
+methodology caveat (orientation-agnostic checks only).
 
 Wired the same way `PositionCheckScreen` (ticket 02) does, adapted to Quick
 Count's ViewModel-owned (not `remember`-owned) shape: `QuickCountViewModel`

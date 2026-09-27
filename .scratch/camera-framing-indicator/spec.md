@@ -281,10 +281,29 @@ across three files; `framingCloseness`/`closeness` naming drift between
 commit (shared `FramingScoreSmoother.next(RawPoseFrame)` extension; unified
 on `framingCloseness` everywhere). Full test suite green throughout.
 
-**On-device verification is still outstanding on all four tickets** — no
-`adb` device was reachable in any of this work's sessions. Each ticket's own
-checklist has its on-device item left honestly unchecked rather than closed
-on inference; see each ticket's Comments for exactly what still needs a real
-device (a Push-Up Set with legs out of frame no longer reads "Lost"; Position
-Check's border responds live and shows dashed/gray correctly; the same for
-Session across a multi-Exercise Routine and for a Quick Count run).
+**On-device verification update**: a Samsung SM-S938B became available and
+tickets 01, 02, and 04 are now genuinely `done` — verified via the app's
+debug-video replay path (`testvideos/push_up_edge.mp4`), covering both the
+positive case (Push-Up doesn't need legs, no false "Lost") and the negative
+case (Squat against upper-body-only footage correctly reads not-Trackable).
+
+This pass **found and fixed a real bug**: the `FramingBorder` was completely
+invisible on the real device in both Position Check and Quick Count Run — a
+`Stroke` drawn with its path exactly on the canvas's own boundary, so half
+its width sat right at the physical screen edge and got swallowed by the
+device's own edge compositing. Fixed by insetting the stroke fully inside
+the canvas (`59d523e`). This is exactly the class of bug the spec's own
+Testing Decisions flagged Compose UI as unable to catch via unit tests —
+on-device verification did its job.
+
+Ticket 03 (Session) reuses the exact same now-fixed component with no
+Session-specific rendering logic, so the fix carries over with high
+confidence, but the live experience of the border's requirement changing
+*between Sets* of a multi-Exercise Routine wasn't directly exercised (the
+debug-video mechanism plays one clip per tracker instance, and a Session
+holds one tracker for its whole run) — see ticket 03's Comments for the
+precise remaining check. Also worth noting for next time: this session's
+verification used a MediaPipe left/right-mirroring quirk specific to
+video-clip replay (see ticket 01's Comments) — fine for the orientation-
+agnostic claims checked here, not a substitute for live-camera testing of
+anything side-dependent.

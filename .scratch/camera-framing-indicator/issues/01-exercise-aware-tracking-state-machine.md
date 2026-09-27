@@ -12,7 +12,7 @@ behavior in Session/Quick Count and through unit tests. See `../spec.md`
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent (code-complete; on-device verification outstanding — see Comments)
+**Status:** done
 
 - [x] `TrackingStateMachine` takes the current step's `ExerciseProfile` and
       checks only that profile's three joints (`jointA`/`vertex`/`jointC`),
@@ -43,11 +43,39 @@ behavior in Session/Quick Count and through unit tests. See `../spec.md`
       `Lost`; updating the profile mid-instance changes which joints are
       checked from that point forward.
 - [x] Typecheck and the full test suite pass.
-- [ ] On-device (or scripted) verification: running a Push-Up Set and
+- [x] On-device (or scripted) verification: running a Push-Up Set and
       stepping legs fully out of frame no longer triggers "Lost track of the
-      person." **Not done — no device/emulator available this session.**
+      person."
 
 ## Comments
+
+**On-device verification (Samsung SM-S938B, physical device over USB):**
+run via the app's debug-video replay path (`testvideos/push_up_edge.mp4`
+pushed in as `debug_video.mp4`, `VideoPoseTracker` swapping in for the real
+camera) rather than a live body, so results only cover orientation-agnostic
+claims — see the caveat below. Two runs, both through Quick Count:
+
+- **Push Up selected, push-up clip played end to end**: `VideoPoseTracker`
+  logged `finished: 505 frames analyzed, pose detected in 505` — zero frames
+  ever read as untracked — and the run completed normally (2 reps, Form
+  Score 50, Tally saved) with the "Lost track of the person" banner never
+  appearing once. Confirms the positive case this checklist item asks for.
+- **Squat selected against the same push-up-framed clip (deliberate
+  mismatch)**: immediately read as not-`Trackable` — banner text switched to
+  "Step into frame so we can see you clearly." and the live border (ticket
+  02) switched to its dashed state — confirming the negative case too: a
+  profile whose required joints genuinely aren't confidently visible does
+  still correctly report Lost/not-Trackable, so this isn't a change that
+  made the check permissive in general, only exercise-appropriate.
+
+**Caveat on this methodology** (see `video-clip-testing-mirror-caveat`
+memory / raised mid-session): `VideoPoseTracker` doesn't apply the
+un-mirroring `CameraPoseTracker` does for a live front camera feed, so
+landmark left/right identity is flipped relative to a real session. Both
+checks above only depend on generic joint-*type* presence/confidence, not
+left/right identity, so this doesn't undermine either result — but it's
+also why this doesn't stand in for verifying anything side-dependent (a
+Lunge's front leg, the still-open `rep-counting-side-consistency` bug).
 
 Implemented via `TrackingStateMachine.accept()` now gating on whether
 `PoseLandmarkFrame.landmarks.keys` contains the current `ExerciseProfile`'s
