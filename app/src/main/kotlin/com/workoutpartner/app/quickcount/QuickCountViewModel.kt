@@ -4,6 +4,8 @@ import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.workoutpartner.app.framing.FramingScoreSmoother
+import com.workoutpartner.app.framing.FramingScorer
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.core.repcounting.Exercise
 import com.workoutpartner.data.TallyRepository
@@ -24,6 +26,16 @@ import java.time.Instant
  * the former, this class the latter, since [QuickCountEngine] stays pure
  * and doesn't read a clock itself). Not unit-tested, the same "impure shell
  * around a tested pure engine" split as `SessionViewModel`/`CameraPoseTracker`.
+ *
+ * Camera-framing-indicator ticket 04 additionally collects [PoseTracker.rawFrames]
+ * (new — this class had no use for them before) through a [FramingScoreSmoother]
+ * into [closeness], so [QuickCountRunScreen] can drive the shared
+ * [com.workoutpartner.app.ui.components.FramingBorder] the same way
+ * `PositionCheckScreen` already does; [QuickCountPhase.Running.trackable]
+ * (already collected from [PoseTracker.signals] via [QuickCountEngine]) is
+ * the border's other input. Quick Count tracks a single Exercise for its
+ * whole run, so unlike `SessionViewModel` there's no per-step profile update
+ * to push to [poseTracker] here.
  */
 class QuickCountViewModel(
     private val trackedProfileId: String,
@@ -44,6 +56,12 @@ class QuickCountViewModel(
     private val _durationSeconds = MutableStateFlow<Int?>(null)
     val durationSeconds: StateFlow<Int?> = _durationSeconds.asStateFlow()
 
+    private val smoother = FramingScoreSmoother()
+
+    /** [FramingScorer]'s continuous distance-closeness score, smoothed across [poseTracker]'s [PoseTracker.rawFrames] — feeds the run screen's [com.workoutpartner.app.ui.components.FramingBorder] color (camera-framing-indicator ticket 04). */
+    private val _closeness = MutableStateFlow(0f)
+    val closeness: StateFlow<Float> = _closeness.asStateFlow()
+
     private var tallySaved = false
 
     init {
@@ -52,6 +70,11 @@ class QuickCountViewModel(
                 engine.onPoseSignal(signal)
                 _phase.value = engine.phase
                 saveTallyIfJustFinished()
+            }
+        }
+        viewModelScope.launch {
+            poseTracker.rawFrames.collect { frame ->
+                _closeness.value = smoother.next(FramingScorer.evaluate(frame).closeness)
             }
         }
         viewModelScope.launch {

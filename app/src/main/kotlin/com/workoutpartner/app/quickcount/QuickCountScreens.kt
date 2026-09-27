@@ -37,6 +37,7 @@ import com.workoutpartner.app.beforeyoustart.BeforeYouStartEngine
 import com.workoutpartner.app.beforeyoustart.BeforeYouStartPhase
 import com.workoutpartner.app.beforeyoustart.PositionCheckScreen
 import com.workoutpartner.app.speech.PromptSpeaker
+import com.workoutpartner.app.ui.components.FramingBorder
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.core.repcounting.Exercise
 import com.workoutpartner.core.repcounting.ExerciseProfile
@@ -131,7 +132,16 @@ fun QuickCountScreen(
     }
 }
 
-/** The Quick Count run itself: camera + live counter, auto-stopping at the target or manually via [QuickCountViewModel.stop]. */
+/**
+ * The Quick Count run itself: camera + live counter, auto-stopping at the
+ * target or manually via [QuickCountViewModel.stop]. Camera-framing-indicator
+ * ticket 04 layers the same live [FramingBorder] Position Check and Session
+ * Tracking use over the preview here, driven by [QuickCountViewModel.closeness]
+ * (smoothed from [PoseTracker.rawFrames]) and the current phase's
+ * [QuickCountPhase.Running.trackable] (already exercise-aware, from
+ * [PoseTracker.signals] via [QuickCountEngine]) — distance never gates
+ * anything, so rep counting and the run's progress are unaffected.
+ */
 @Composable
 fun QuickCountRunScreen(
     trackedProfileId: String,
@@ -160,6 +170,7 @@ fun QuickCountRunScreen(
     )
     val phase by viewModel.phase.collectAsState()
     val durationSeconds by viewModel.durationSeconds.collectAsState()
+    val closeness by viewModel.closeness.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // This ViewModel is Activity-scoped (see its own release() doc comment) — without this,
@@ -181,6 +192,10 @@ fun QuickCountRunScreen(
                         }
                     },
                 )
+                // Camera-framing-indicator ticket 04: the same shared border Position Check and Session
+                // Tracking use, drawn as an outline only (Stroke, not a fill) so it never obstructs the
+                // rep count/target UI drawn on top of it below.
+                FramingBorder(trackable = current.trackable, closeness = closeness, modifier = Modifier.fillMaxSize())
                 Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
                     if (!current.trackable) {
                         Card(modifier = Modifier.fillMaxWidth()) {
