@@ -65,8 +65,8 @@ The how-to card for one Exercise or Exercise Variant — correct form, common mi
 _Avoid_: Exercise Guide Card, Tutorial
 
 **Position Check**:
-The camera-framing check that confirms the whole body is in frame at a workable distance before tracking starts. Advisory, not blocking — the Athlete can start anyway. Used both before a Session and before a Quick Count run.
-_Avoid_: Camera Setup, Calibration
+The camera-framing check that confirms the joints the upcoming Exercise needs are in frame at a workable distance before tracking starts — which joints those are depends on which Exercise (or Exercise Variant) is about to run, not a fixed whole-body requirement. Advisory, not blocking — the Athlete can start anyway. Used both before a Session and before a Quick Count run.
+_Avoid_: Camera Setup, Calibration, Whole body in frame (superseded — see above)
 
 **Session**:
 One instance of an Athlete working through a Routine, start to finish, made up of one or more Sets.
