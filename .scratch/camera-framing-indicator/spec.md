@@ -268,3 +268,23 @@ sequence of frames produces, or the score/color/bin a `RawPoseFrame` produces
   under-counts when the current Exercise's specific required joints aren't
   tracked — precisely the marginal-framing situation this indicator is meant
   to help the Athlete correct, not a failure mode it eliminates.
+
+## Comments
+
+**Update:** all four tickets are code-complete, `/code-review`'d as one
+combined pass (Standards + Spec sub-agents against `master`), and merged into
+`feature/camera-framing-indicator` — PR #1, marked ready for review. Spec
+axis came back with zero findings. Standards axis found two judgement-call
+smells from the four-implementer split (duplicated score-then-smooth glue
+across three files; `framingCloseness`/`closeness` naming drift between
+`SessionViewModel` and `QuickCountViewModel`) — both fixed in a follow-up
+commit (shared `FramingScoreSmoother.next(RawPoseFrame)` extension; unified
+on `framingCloseness` everywhere). Full test suite green throughout.
+
+**On-device verification is still outstanding on all four tickets** — no
+`adb` device was reachable in any of this work's sessions. Each ticket's own
+checklist has its on-device item left honestly unchecked rather than closed
+on inference; see each ticket's Comments for exactly what still needs a real
+device (a Push-Up Set with legs out of frame no longer reads "Lost"; Position
+Check's border responds live and shows dashed/gray correctly; the same for
+Session across a multi-Exercise Routine and for a Quick Count run).
