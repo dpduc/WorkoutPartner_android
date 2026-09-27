@@ -2,6 +2,7 @@ package com.workoutpartner.core.posetracking
 
 import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
+import com.workoutpartner.core.repcounting.ExerciseProfile
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -33,4 +34,14 @@ interface PoseTracker {
 
     /** Unbinds the camera and releases the MediaPipe Pose Landmarker. Safe to call multiple times, including without a prior [start]. */
     fun stop()
+
+    /**
+     * Swaps which [ExerciseProfile]'s joints [signals] treats as required for
+     * a frame to count as tracked (camera-framing-indicator ticket 01) — e.g.
+     * a Session moving into its next Set's Exercise. Never needed by a caller
+     * tracking a single Exercise for its whole run (Quick Count, Position
+     * Check). Doesn't reset any Lost/Trackable debounce already in progress —
+     * see [TrackingStateMachine.updateProfile].
+     */
+    fun updateExerciseProfile(profile: ExerciseProfile)
 }

@@ -40,8 +40,11 @@ import com.workoutpartner.data.RoutineWithSteps
 import com.workoutpartner.data.SetRepository
 import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.core.posetracking.PoseTracker
+import com.workoutpartner.core.repcounting.ExerciseProfile
+import com.workoutpartner.core.repcounting.ExerciseProfiles
 import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.app.debug.isDebuggableBuild
+import com.workoutpartner.app.ui.components.FramingBorder
 import com.workoutpartner.app.ui.components.PoseOverlay
 import com.workoutpartner.core.posetracking.RawPoseFrame
 import java.util.UUID
@@ -103,7 +106,8 @@ fun SessionScreen(
     accountId: String?,
     setRepository: SetRepository,
     accountRepository: AccountRepository,
-    poseTrackerFactory: () -> PoseTracker,
+    /** Creates the camera-backed tracker for the whole Session, given the initial [ExerciseProfile] to check joints against (camera-framing-indicator ticket 01) — the Routine's first Set's Exercise/Variant. [SessionViewModel] pushes further updates as the Routine moves between Sets. */
+    poseTrackerFactory: (ExerciseProfile) -> PoseTracker,
     difficultyTier: DifficultyTier = DifficultyTier.STANDARD,
     /** The Athlete's Overview toggle choice for this Session's Jumping Jack steps (`workout-partner-v3` ticket 11) — see [SessionViewModel]. */
     jumpingJackVariant: ExerciseVariant? = null,
@@ -116,13 +120,19 @@ fun SessionScreen(
     // started in the same app run would be handed the first (finished) Session's ViewModel and its summary.
     val viewModelKey = remember { UUID.randomUUID().toString() }
     val showPoseOverlay = remember { context.isDebuggableBuild() }
+    // The Routine's first Set's Exercise/Variant (camera-framing-indicator ticket 01) —
+    // the same steps SessionViewModel itself builds from routine/difficultyTier/jumpingJackVariant.
+    val initialProfile = remember(routine, difficultyTier, jumpingJackVariant) {
+        val firstStep = routine.toRoutineSteps(difficultyTier, jumpingJackVariant).first()
+        ExerciseProfiles.forExercise(firstStep.exercise, firstStep.variant)
+    }
     val viewModel: SessionViewModel = viewModel(
         key = viewModelKey,
         factory = remember {
             viewModelFactory {
                 initializer {
                     SessionViewModel(
-                        routine, accountId, setRepository, accountRepository, poseTrackerFactory(),
+                        routine, accountId, setRepository, accountRepository, poseTrackerFactory(initialProfile),
                         showPoseOverlay = showPoseOverlay,
                         speaker = PromptSpeaker(context),
                         phrases = ResourceAnnouncerPhrases(context),
@@ -137,6 +147,7 @@ fun SessionScreen(
     val phase by viewModel.phase.collectAsState()
     val account by viewModel.account.collectAsState()
     val poseFrame by viewModel.poseFrame.collectAsState()
+    val framingCloseness by viewModel.framingCloseness.collectAsState()
 
     Surface(modifier = modifier.fillMaxSize()) {
         when (val current = phase) {
@@ -148,6 +159,7 @@ fun SessionScreen(
                 onFinishSet = viewModel::finishSet,
                 poseFrame = if (showPoseOverlay) poseFrame else null,
                 previewMirrored = viewModel.previewMirrored,
+                framingCloseness = framingCloseness,
             )
             is SessionPhase.SetSummary -> SetSummaryContent(
                 current,
@@ -184,6 +196,15 @@ private fun CountdownContent(phase: SessionPhase.Countdown, modifier: Modifier =
  * tracking toward — read from the engine's own phase rather than
  * recomputed here, so this layout can never drift from what a Good Set
  * actually requires.
+ *
+ * Camera-framing-indicator ticket 03 adds [FramingBorder] here, the same
+ * shared component (and distance-scoring pipeline) ticket 02 built for
+ * Position Check: [framingCloseness] is [SessionViewModel]'s continuously
+ * updated, already-smoothed score, and [SessionPhase.Tracking.trackable] is
+ * the same exercise-aware `TrackingStateMachine` signal (see ADR-0011)
+ * driving the "Lost track of you" banner below — one source of truth for
+ * both. It's drawn as an outline only (no fill), so it never covers the rep
+ * count/target/progress UI it's layered under.
  */
 @Composable
 private fun TrackingContent(
@@ -194,6 +215,8 @@ private fun TrackingContent(
     /** Debug builds only: the latest frame's landmarks, drawn over the preview by [PoseOverlay]. */
     poseFrame: RawPoseFrame?,
     previewMirrored: Boolean,
+    /** [SessionViewModel.framingCloseness] — smoothed every pose frame, unconditionally (ticket 03). */
+    framingCloseness: Float,
     modifier: Modifier = Modifier,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -212,6 +235,7 @@ private fun TrackingContent(
             },
         )
         if (poseFrame != null) PoseOverlay(poseFrame, mirrored = previewMirrored, modifier = Modifier.fillMaxSize())
+        FramingBorder(trackable = phase.trackable, closeness = framingCloseness, modifier = Modifier.fillMaxSize())
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween,

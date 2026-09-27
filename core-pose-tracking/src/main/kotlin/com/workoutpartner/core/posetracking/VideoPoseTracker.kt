@@ -12,6 +12,7 @@ import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
+import com.workoutpartner.core.repcounting.ExerciseProfile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -83,13 +84,18 @@ import java.io.File
  * Not unit-tested, for the same reason as [CameraPoseTracker]: it needs a real device runtime for
  * MediaPipe, the media decoder, and OpenGL.
  */
-class VideoPoseTracker(private val context: Context, private val videoFile: File) : PoseTracker {
+class VideoPoseTracker(
+    private val context: Context,
+    private val videoFile: File,
+    /** See [CameraPoseTracker]'s own parameter of the same name (camera-framing-indicator ticket 01) — kept in step with it for consistency, even though this debug-only tracker never has a Session pushing mid-run updates through [updateExerciseProfile] in practice. */
+    initialProfile: ExerciseProfile,
+) : PoseTracker {
 
     override val mirrorsPreview = false
 
     private var scope: CoroutineScope? = null
     private var playback: Job? = null
-    private val trackingStateMachine = TrackingStateMachine()
+    private val trackingStateMachine = TrackingStateMachine(initialProfile)
     private var emitSignal: ((PoseTrackingSignal) -> Unit)? = null
     private var emitRawFrame: ((RawPoseFrame) -> Unit)? = null
     private var emitError: ((String) -> Unit)? = null
@@ -126,6 +132,10 @@ class VideoPoseTracker(private val context: Context, private val videoFile: File
         scope?.cancel()
         scope = null
         playback = null
+    }
+
+    override fun updateExerciseProfile(profile: ExerciseProfile) {
+        trackingStateMachine.updateProfile(profile)
     }
 
     private suspend fun play() {

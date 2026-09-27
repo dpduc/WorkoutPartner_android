@@ -4,6 +4,9 @@ import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.workoutpartner.app.framing.FramingScoreSmoother
+import com.workoutpartner.app.framing.FramingScorer
+import com.workoutpartner.app.framing.next
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.core.repcounting.Exercise
 import com.workoutpartner.data.TallyRepository
@@ -24,6 +27,16 @@ import java.time.Instant
  * the former, this class the latter, since [QuickCountEngine] stays pure
  * and doesn't read a clock itself). Not unit-tested, the same "impure shell
  * around a tested pure engine" split as `SessionViewModel`/`CameraPoseTracker`.
+ *
+ * Camera-framing-indicator ticket 04 additionally collects [PoseTracker.rawFrames]
+ * (new — this class had no use for them before) through a [FramingScoreSmoother]
+ * into [framingCloseness], so [QuickCountRunScreen] can drive the shared
+ * [com.workoutpartner.app.ui.components.FramingBorder] the same way
+ * `PositionCheckScreen` already does; [QuickCountPhase.Running.trackable]
+ * (already collected from [PoseTracker.signals] via [QuickCountEngine]) is
+ * the border's other input. Quick Count tracks a single Exercise for its
+ * whole run, so unlike `SessionViewModel` there's no per-step profile update
+ * to push to [poseTracker] here.
  */
 class QuickCountViewModel(
     private val trackedProfileId: String,
@@ -44,6 +57,12 @@ class QuickCountViewModel(
     private val _durationSeconds = MutableStateFlow<Int?>(null)
     val durationSeconds: StateFlow<Int?> = _durationSeconds.asStateFlow()
 
+    private val smoother = FramingScoreSmoother()
+
+    /** [FramingScorer]'s continuous distance-closeness score, smoothed across [poseTracker]'s [PoseTracker.rawFrames] — feeds the run screen's [com.workoutpartner.app.ui.components.FramingBorder] color (camera-framing-indicator ticket 04). */
+    private val _framingCloseness = MutableStateFlow(0f)
+    val framingCloseness: StateFlow<Float> = _framingCloseness.asStateFlow()
+
     private var tallySaved = false
 
     init {
@@ -52,6 +71,11 @@ class QuickCountViewModel(
                 engine.onPoseSignal(signal)
                 _phase.value = engine.phase
                 saveTallyIfJustFinished()
+            }
+        }
+        viewModelScope.launch {
+            poseTracker.rawFrames.collect { frame ->
+                _framingCloseness.value = smoother.next(frame)
             }
         }
         viewModelScope.launch {
@@ -91,7 +115,21 @@ class QuickCountViewModel(
         }
     }
 
-    override fun onCleared() {
+    /**
+     * Stops the camera/pose tracker — released by [QuickCountRunScreen]'s own
+     * `DisposableEffect` (same pattern as `SessionScreens.kt`'s), not just
+     * [onCleared]: this app has no back-stack-scoped `ViewModelStoreOwner`
+     * (`MainActivity`'s screen switch is a plain `mutableStateOf<AppScreen>`),
+     * so a [ViewModel] created via `viewModel()` is Activity-scoped and
+     * [onCleared] alone would leave the camera — and camera-session-robustness
+     * ticket 02's Foreground Service — running until the whole Activity dies,
+     * not when the Athlete actually navigates away from this run. Safe to
+     * call more than once ([PoseTracker.stop]'s own doc comment promises
+     * this), so [onCleared] calling it too is not a double-stop hazard.
+     */
+    fun release() {
         poseTracker.stop()
     }
+
+    override fun onCleared() = release()
 }

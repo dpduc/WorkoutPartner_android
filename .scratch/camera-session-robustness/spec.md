@@ -113,3 +113,39 @@ Foreground Service to log/notify through):
 **Review deferred to when every ticket here ships.** Ticket 01 is done; the
 owner is holding off reviewing this spec's work until 02 and 03 are also
 shipped, then looking at all three together rather than one at a time.
+
+**REMINDER — on-device verification for 02 and 03 is on the owner, not an
+agent.** Both tickets are code-complete (typechecked, full test suite
+green, `/code-review`'d — see each ticket's own Comments for the outcome)
+but neither is marked `done`: ticket 02's last checkbox (notification
+appears/disappears, survives backgrounding) and ticket 03's last checkbox
+(forcing a real recoverable camera loss, e.g. another camera app grabbing
+the camera; and confirming an unrecoverable one surfaces a visible error)
+both need a real device in hand, and no `adb` device is currently
+reachable. Next session: plug in the device, run through both checklists,
+then mark each `done`.
+
+**Update:** committed anyway on the owner's explicit call (no device
+available; asked, chose "commit it as-is now" over waiting to reconnect
+one). Both tickets landed together in one commit — see ticket 02's Comments
+for why they couldn't be split — with the on-device checkbox still
+unticked on both.
+
+**Update — on-device verification actually ran** (Samsung SM-S938B over
+USB, once reconnected): ticket 02 is now `done` — its own checklist item
+was found to be genuinely broken on-device (a stranded Foreground Service
+after a Quick Count run ended) and fixed as part of verifying it; see its
+Comments for the bug and fix. Ticket 03's recoverable-loss half is verified
+with real evidence (a forced `ERROR_CAMERA_IN_USE`, real automatic
+reconnect); its unrecoverable-loss half was deliberately not forced (no
+safe/practical way to trigger a `CRITICAL` `StateError` on the owner's
+personal device) and stays open — see its Comments for the reasoning. This
+reminder can be retired once that last half is either verified or the
+owner decides the structural argument already on file is enough.
+
+A third, separate bug surfaced while chasing the stranded-service one:
+`QuickCountViewModel` was reused stale across repeat Quick Count runs in
+the same app session (same Activity-scoped-`viewModel()` root cause,
+different symptom). Not part of this spec, but fixed alongside it anyway —
+see ticket 02's Comments — since the codebase already had the exact right
+pattern (`SessionScreens.kt`'s per-Session `viewModel()` key) on file.

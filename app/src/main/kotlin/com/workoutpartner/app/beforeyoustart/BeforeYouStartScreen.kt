@@ -16,6 +16,8 @@ import com.workoutpartner.app.session.toRoutineSteps
 import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.app.ui.components.CameraPermissionGate
 import com.workoutpartner.core.posetracking.PoseTracker
+import com.workoutpartner.core.repcounting.ExerciseProfile
+import com.workoutpartner.core.repcounting.ExerciseProfiles
 import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.data.RoutineWithSteps
 import kotlinx.coroutines.delay
@@ -55,8 +57,8 @@ fun BeforeYouStartScreen(
     /** Whether the Athlete's BMI is ≥ 30 (`workout-partner-v3` ticket 11) — [WorkoutOverviewScreen]'s Jumping Jack/Step Jack toggle defaults to Step Jack when true. See [com.workoutpartner.app.routines.RoutineDifficulty.isObese]. */
     defaultToStepJack: Boolean,
     formGuidePrefs: FormGuidePrefs,
-    /** Creates the camera-backed tracker the Position Check (ticket 12) reads frames from; stopped again when that phase ends, before the Session creates its own. */
-    poseTrackerFactory: () -> PoseTracker,
+    /** Creates the camera-backed tracker the Position Check (ticket 12) reads frames from, given the initial [ExerciseProfile] to check joints against (camera-framing-indicator ticket 01); stopped again when that phase ends, before the Session creates its own. */
+    poseTrackerFactory: (ExerciseProfile) -> PoseTracker,
     onReadyForSession: (jumpingJackVariant: ExerciseVariant?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -96,10 +98,17 @@ fun BeforeYouStartScreen(
         currentPhase is BeforeYouStartPhase.PositionCheck -> {
             val activeEngine = engine
             if (activeEngine != null) {
+                // The Routine's first Set's Exercise/Variant (camera-framing-indicator
+                // ticket 01) — the same "first step" reading the Countdown phase below
+                // uses for its own first-Set announcement.
+                val firstSetProfile = remember(routine, jumpingJackVariant) {
+                    val firstStep = routine.toRoutineSteps(difficultyTier, jumpingJackVariant).first()
+                    ExerciseProfiles.forExercise(firstStep.exercise, firstStep.variant)
+                }
                 CameraPermissionGate {
                     PositionCheckScreen(
                         engine = activeEngine,
-                        poseTracker = remember { poseTrackerFactory() },
+                        poseTracker = remember { poseTrackerFactory(firstSetProfile) },
                         speaker = speaker,
                         onPhaseChanged = { phase = activeEngine.phase },
                         modifier = modifier,

@@ -7,11 +7,15 @@ import androidx.camera.core.Preview
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.workoutpartner.app.framing.FramingScoreSmoother
+import com.workoutpartner.app.framing.FramingScorer
+import com.workoutpartner.app.framing.next
 import com.workoutpartner.app.routines.DifficultyTier
 import com.workoutpartner.app.routines.RoutineDifficulty
 import com.workoutpartner.app.speech.PromptSpeaker
 import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.core.posetracking.RawPoseFrame
+import com.workoutpartner.core.repcounting.ExerciseProfiles
 import com.workoutpartner.core.repcounting.ExerciseVariant
 import com.workoutpartner.data.AccountEntity
 import com.workoutpartner.data.AccountRepository
@@ -72,6 +76,11 @@ class SessionViewModel(
     val poseFrame: StateFlow<RawPoseFrame?> = _poseFrame.asStateFlow()
     val previewMirrored: Boolean = poseTracker.mirrorsPreview
 
+    /** [FramingScorer]'s smoothed closeness score, for [com.workoutpartner.app.ui.components.FramingBorder]'s color during Tracking (camera-framing-indicator ticket 03) — fed by the same unconditional [PoseTracker.rawFrames] collection [_poseFrame] uses, so this has data in release builds even though [_poseFrame] itself stays debug-only. */
+    private val framingSmoother = FramingScoreSmoother()
+    private val _framingCloseness = MutableStateFlow(0f)
+    val framingCloseness: StateFlow<Float> = _framingCloseness.asStateFlow()
+
     private val _account = MutableStateFlow<AccountEntity?>(null)
     val account: StateFlow<AccountEntity?> = _account.asStateFlow()
 
@@ -95,8 +104,14 @@ class SessionViewModel(
                 beepIfNewRep()
             }
         }
-        if (showPoseOverlay) {
-            viewModelScope.launch { poseTracker.rawFrames.collect { _poseFrame.value = it } }
+        // Unconditional (camera-framing-indicator ticket 03) — was showPoseOverlay-gated/debug-only,
+        // which left the framing border with no data in release builds. _poseFrame (the debug pose
+        // overlay) stays gated; the framing score below does not.
+        viewModelScope.launch {
+            poseTracker.rawFrames.collect { frame ->
+                if (showPoseOverlay) _poseFrame.value = frame
+                _framingCloseness.value = framingSmoother.next(frame)
+            }
         }
         viewModelScope.launch {
             poseTracker.errors.collect { message ->
@@ -164,8 +179,18 @@ class SessionViewModel(
         if (cameraUnavailable) return
         val previous = _phase.value
         val next = engine.phase
-        if (next::class != previous::class || (next as? SessionPhase.Tracking)?.stepIndex != (previous as? SessionPhase.Tracking)?.stepIndex) {
-            Log.i(TRACE_TAG, "phase: ${previous::class.simpleName} -> ${next::class.simpleName}${(next as? SessionPhase.Tracking)?.let { " (step ${it.stepIndex})" } ?: ""}")
+        val previousStepIndex = (previous as? SessionPhase.Tracking)?.stepIndex
+        val nextStepIndex = (next as? SessionPhase.Tracking)?.stepIndex
+        if (next::class != previous::class || nextStepIndex != previousStepIndex) {
+            Log.i(TRACE_TAG, "phase: ${previous::class.simpleName} -> ${next::class.simpleName}${nextStepIndex?.let { " (step $it)" } ?: ""}")
+        }
+        // The Routine's just-started step's own Exercise/Variant (camera-framing-indicator
+        // ticket 01) — pushed to the tracker so its exercise-aware Trackable/Lost check
+        // (and the future framing indicator) track what's actually being counted right now,
+        // not whatever Set started the Session.
+        if (nextStepIndex != null && nextStepIndex != previousStepIndex) {
+            val step = steps[nextStepIndex]
+            poseTracker.updateExerciseProfile(ExerciseProfiles.forExercise(step.exercise, step.variant))
         }
         _phase.value = next
         announcer.announce(previous, next).forEach(speaker::speak)
