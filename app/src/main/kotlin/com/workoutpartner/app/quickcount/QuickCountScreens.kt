@@ -41,6 +41,7 @@ import com.workoutpartner.core.posetracking.PoseTracker
 import com.workoutpartner.core.repcounting.Exercise
 import com.workoutpartner.data.TallyRepository
 import com.workoutpartner.data.TrackedProfileEntity
+import java.util.UUID
 
 /** Pick an Exercise and an optional target count for [profile] (spec.md story 35/36), then start the run. */
 @Composable
@@ -137,7 +138,14 @@ fun QuickCountRunScreen(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // A fresh key per run: `viewModel(...)` is scoped to the Activity (this app has no
+    // back-stack-scoped ViewModelStoreOwner), so without one, a second Quick Count run started
+    // in the same app session would be handed the first (finished) run's stale ViewModel and
+    // never actually start a new camera session — same fix SessionScreens.kt already applies
+    // for the same reason.
+    val viewModelKey = remember { UUID.randomUUID().toString() }
     val viewModel: QuickCountViewModel = viewModel(
+        key = viewModelKey,
         factory = remember {
             viewModelFactory {
                 initializer { QuickCountViewModel(trackedProfileId, exercise, target, tallyRepository, poseTrackerFactory()) }
@@ -147,6 +155,12 @@ fun QuickCountRunScreen(
     val phase by viewModel.phase.collectAsState()
     val durationSeconds by viewModel.durationSeconds.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // This ViewModel is Activity-scoped (see its own release() doc comment) — without this,
+    // navigating away via onDone (or Back) would strand the camera and camera-session-robustness
+    // ticket 02's Foreground Service running until the whole Activity is destroyed, not when this
+    // screen actually leaves composition. Same pattern as SessionScreens.kt's own DisposableEffect.
+    DisposableEffect(viewModel) { onDispose { viewModel.release() } }
 
     Surface(modifier = modifier.fillMaxSize()) {
         when (val current = phase) {

@@ -91,7 +91,21 @@ class QuickCountViewModel(
         }
     }
 
-    override fun onCleared() {
+    /**
+     * Stops the camera/pose tracker — released by [QuickCountRunScreen]'s own
+     * `DisposableEffect` (same pattern as `SessionScreens.kt`'s), not just
+     * [onCleared]: this app has no back-stack-scoped `ViewModelStoreOwner`
+     * (`MainActivity`'s screen switch is a plain `mutableStateOf<AppScreen>`),
+     * so a [ViewModel] created via `viewModel()` is Activity-scoped and
+     * [onCleared] alone would leave the camera — and camera-session-robustness
+     * ticket 02's Foreground Service — running until the whole Activity dies,
+     * not when the Athlete actually navigates away from this run. Safe to
+     * call more than once ([PoseTracker.stop]'s own doc comment promises
+     * this), so [onCleared] calling it too is not a double-stop hazard.
+     */
+    fun release() {
         poseTracker.stop()
     }
+
+    override fun onCleared() = release()
 }

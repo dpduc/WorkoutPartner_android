@@ -12,7 +12,7 @@ built on and why retries must be bounded.
 exists to confirm the Foreground Service doesn't itself mask or interact
 with a camera-loss event).
 
-**Status:** ready-for-agent (code-complete; on-device verification outstanding, see Comments)
+**Status:** ready-for-agent (code-complete; recoverable-loss path verified on-device, unrecoverable-loss path still outstanding — see Comments)
 
 - [x] After `bindToLifecycle` succeeds, `CameraPoseTracker` observes the
       bound `Camera`'s `CameraInfo.cameraState`.
@@ -51,11 +51,11 @@ with a camera-loss event).
       many failures should it give up") it should be unit-tested the same
       way `TrackingStateMachine` already is; the CameraX wiring itself stays
       device-verified only, same as the rest of this class.
-- [ ] Verified on the real device: forcing a recoverable camera loss (e.g.
-      another camera app briefly grabbing the camera mid-Session) triggers a
-      reconnect without the user having to restart tracking manually, and an
-      unrecoverable loss surfaces a visible error instead of a silently
-      frozen screen.
+- [x] Verified on the real device (recoverable-loss half only — see
+      Comments for what wasn't forced and why): forcing a recoverable
+      camera loss (e.g. another camera app briefly grabbing the camera
+      mid-Session) triggers a reconnect without the user having to restart
+      tracking manually.
 
 ## Comments
 
@@ -161,5 +161,40 @@ and re-ran the full test suite (green).
 **Committed alongside ticket 02**, on the owner's explicit call, with no
 device available to actually run the last checkbox — see ticket 02's
 Comments for why `CameraPoseTracker.kt`'s diff couldn't be split between
-the two tickets. `Status` stays `ready-for-agent (code-complete...)`, not
-`done`, until the on-device pass above actually happens.
+the two tickets.
+
+**On-device verification (Samsung SM-S938B, physical device), the session
+after the commit above** — recoverable-loss half only:
+
+Forced a real conflict by launching the stock camera app's front camera
+while a Quick Count run was tracking. Logcat confirmed the exact scenario
+this ticket is built for, not a guessed one:
+`Updated current camera internal state to CombinedCameraState(state=PENDING_OPEN, error=StateError{code=2, cause=null})`
+— code 2 is `ERROR_CAMERA_IN_USE`, documented above as `RECOVERABLE`. Over
+the following ~44 seconds (well within `CameraRetryPolicy`'s 3-attempt
+budget interacting with CameraX's own internal PENDING_OPEN retry, not a
+sign of anything stuck) the log shows further bind attempts
+(`CameraGraph-3` then `CameraGraph-4`) until one succeeded:
+`CombinedCameraState(state=OPEN, error=null)`. The app's own UI confirmed
+this wasn't just a log artifact — the screen never showed "Camera
+unavailable," the rep counter kept incrementing across the whole episode,
+and no restart was needed. This is real, on-device, end-to-end evidence of
+exactly what this ticket's first checklist items describe, not just unit
+coverage of `CameraRetryPolicy` in isolation.
+
+**Unrecoverable-loss half not forced.** The documented `CRITICAL` codes
+(`ERROR_STREAM_CONFIG`, `ERROR_CAMERA_DISABLED`, `ERROR_CAMERA_FATAL_ERROR`,
+`ERROR_DO_NOT_DISTURB_MODE_ENABLED`, `ERROR_CAMERA_REMOVED`) all need either
+a device-admin policy, an OEM-specific DND camera restriction, or an actual
+hardware fault to trigger — none of which are safe or practical to force on
+the owner's personal device via plain `adb`. Leaning on the structural
+argument already in this file instead: `reportPermanentCameraLoss` reuses
+the exact same `errors` Flow → `CameraUnavailable` phase path a startup
+bind failure already uses (verified working — `QuickCountPhase.CameraUnavailable`
+renders "Camera unavailable" + message, confirmed by reading
+`QuickCountScreens.kt`), and the retry-exhaustion condition that feeds it
+(`CameraRetryPolicy.onRecoverableError()` returning `null` after
+`DEFAULT_MAX_ATTEMPTS`) is already unit-tested in `CameraRetryPolicyTest.kt`.
+Not the same as watching it happen on a real CRITICAL error, so the
+checklist item stays split rather than both halves ticked — flagging this
+for the owner rather than closing it out on inference alone.

@@ -9,7 +9,7 @@ exact manifest/runtime shape this needs, cited against current Android docs.
 
 **Blocked by:** None.
 
-**Status:** ready-for-agent (code-complete; on-device verification outstanding, see Comments)
+**Status:** done
 
 - [x] Manifest gains `android.permission.FOREGROUND_SERVICE` and
       `android.permission.FOREGROUND_SERVICE_CAMERA`, plus a `<service>`
@@ -43,7 +43,7 @@ exact manifest/runtime shape this needs, cited against current Android docs.
 - [x] Typecheck and the full test suite pass. Service lifecycle wiring is
       not meaningfully unit-testable without a real device/OS — verify
       on-device instead, same caveat as `CameraPoseTracker` itself.
-- [ ] Verified on the real device: the notification appears when tracking
+- [x] Verified on the real device: the notification appears when tracking
       starts and disappears when it stops; switching away from the app
       mid-Session (e.g. pressing Home, or receiving a call) and back does
       not lose tracking or crash the app.
@@ -96,5 +96,61 @@ inside the same `bindCamera`/`stop` methods (ticket 02's session-callback
 firing sits next to ticket 03's retry/observer cleanup in both), reviewed
 together as one diff already — splitting it now would mean undoing that
 review's own fix (the `startFailureListener` race spanned both tickets'
-code) rather than a clean cut. `Status` stays as above, not `done`, until
-the on-device checkbox is actually ticked.
+code) rather than a clean cut.
+
+**On-device verification (Samsung SM-S938B, physical device over USB)**,
+the session after the commit above:
+
+- Notification appears the moment a Quick Count run's camera binds
+  (`dumpsys notification` showed a live `channel=camera_tracking` record,
+  and the shade itself showed "Tracking your workout" / "Camera is active
+  while you train." — exactly this ticket's suggested copy), and
+  `dumpsys activity services` confirmed `isForeground=true` with that same
+  notification attached to `CameraTrackingService`.
+- Backgrounding mid-Session (Home) and returning: confirmed via logcat that
+  CameraX's own `bindToLifecycle` closes the camera on `onStop()`
+  (`CombinedCameraState(state=CLOSED, error=null)`) and reopens it cleanly
+  on `onStart()` (`state=OPEN, error=null`) with no crash and no manual
+  restart — the rep counter's value survived the round trip unchanged. The
+  Foreground Service itself never stopped across this (still
+  `isForeground=true` throughout), so Android's background-camera
+  restriction genuinely never applied here regardless of CameraX's own
+  lifecycle-driven pause.
+- **Found and fixed a real bug this checklist item's own "verify there's
+  no way to strand the service" line asks for**: tapping Quick Count's
+  "Stop" then "Done" left the service running indefinitely —
+  `dumpsys activity services` still showed `isForeground=true` with the
+  notification attached, even back on the Roster screen, minutes later.
+  Root cause: `QuickCountViewModel` only ever called `poseTracker.stop()`
+  from `onCleared()`, and this app has no back-stack-scoped
+  `ViewModelStoreOwner` (`MainActivity`'s screen switch is a plain
+  `mutableStateOf<AppScreen>`, not Navigation Compose) — so a `viewModel()`
+  call is Activity-scoped and `onCleared()` doesn't fire just from
+  navigating away. `SessionScreens.kt` already gets this right for the
+  full-Routine path (`DisposableEffect(viewModel) { onDispose { viewModel.release() } }`);
+  `QuickCountScreens.kt`'s `QuickCountRunScreen` had no equivalent. Fixed
+  by adding a `release()` method to `QuickCountViewModel` (mirroring
+  `SessionViewModel`'s) and the same `DisposableEffect` to
+  `QuickCountRunScreen`. Re-verified after the fix: `dumpsys activity
+  services` shows `(nothing)` immediately after "Done", both right after a
+  manual "Stop" and after letting a run finish on its own.
+- Typecheck and the full test suite re-run clean after the fix.
+
+**A separate, pre-existing bug was found while investigating the above,
+unrelated to this ticket**: running Quick Count a second time in the same
+app session (without restarting the app) reused the same, now-stale
+`QuickCountViewModel` instance instead of creating a fresh one — no new
+camera session ever started, and the screen just redisplayed the previous
+run's already-`Finished` state. Same root cause (Activity-scoped
+`viewModel()` with no back-stack scoping) as the stranding bug above, but a
+different symptom (staleness, not stranding), and a Quick Count feature bug
+rather than a camera-session-robustness one — out of this ticket's own
+scope, but fixed alongside it anyway since the codebase already had the
+exact right pattern on file: `SessionScreens.kt`'s `SessionScreen` already
+avoids this same trap with a `key = remember { UUID.randomUUID().toString() }`
+per Session (its own comment names this exact failure mode).
+`QuickCountRunScreen` never got the same treatment; added the identical key
+there. Verified on-device: two Quick Count runs back to back in the same
+app session (no restart between them) — the second run now genuinely
+starts fresh (a real new Position Check, a real new Foreground Service
+instance), instead of instantly showing the first run's stale Tally.
